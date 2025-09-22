@@ -12,6 +12,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #ifdef USERPROG
+#include <iostream> // --- IGNORE ---
 #include "userprog/process.h"
 #endif
 
