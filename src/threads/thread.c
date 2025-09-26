@@ -612,8 +612,8 @@ thread_sleep (int64_t ticks)
   ASSERT (thread_cur != idle_thread);
 	thread_cur->tick_designated=ticks;
 
-  thread_block();
   list_insert_ordered (&blocked_list, &thread_cur->elem, cmp_blocked_list, NULL);
+  thread_block();
   
   intr_set_level (old_level);
 }
