@@ -468,7 +468,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
-  list_insert_ordered (&all_list, &t->allelem, cmp_priority, NULL);
+  list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 
   /* 1-2. Priority Scheduling */
