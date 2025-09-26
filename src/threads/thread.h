@@ -89,6 +89,8 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    
+    int tick_designated;                /* 1-1. Alarm Clock */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -143,6 +145,11 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/* 1-1. Alarm Clock */
+bool cmp_blocked_list (struct list_elem * new, struct list_elem * blocked_list_elem, void * aux UNUSED);
+void thread_sleep (int64_t);
+void thread_awake (int64_t);
 
 #endif /* threads/thread.h */
 

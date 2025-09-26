@@ -28,6 +28,9 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* 1-1. Alarm Clock */
+static struct list blocked_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -92,6 +95,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&blocked_list); /* 1-1. Alarm Clock */
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -591,6 +595,55 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
+/* 1-1. Alarm Clock */
+bool
+cmp_blocked_list
+(struct list_elem * new, struct list_elem * blocked_list_elem, void * aux UNUSED)
+{
+  struct thread* new_entry = list_entry(new, struct thread, elem);
+  struct thread* blocked_list_entry = list_entry(blocked_list_elem, struct thread, elem);
+
+  if((blocked_list_entry->tick_designated) > (new_entry->tick_designated)){
+    return true;
+  }
+  else{
+    return false;
+  }
+}
+
+void 
+thread_sleep (int64_t ticks)
+{
+  enum intr_level old_level = intr_disable ();
+
+  struct thread * thread_cur = thread_current ();
+  ASSERT (thread_cur != idle_thread);
+	thread_cur->tick_designated=ticks;
+
+  list_insert_ordered (&blocked_list, &thread_cur->elem, cmp_blocked_list, NULL);
+  thread_block();
+  
+  intr_set_level (old_level);
+}
+
+void 
+thread_awake (int64_t ticks)
+{
+  struct thread * thread_temp;
+  while (!list_empty(&blocked_list)) {
+    thread_temp = list_entry(list_begin(&blocked_list), struct thread, elem);
+
+	  if (thread_temp->tick_designated <= ticks) {
+		  list_pop_front(&blocked_list);
+	    thread_unblock(thread_temp);
+	  }
+	  else{
+		  break;
+	  }
+  }
+}
+/* 1-1. Alarm Clock */
+
 /* 1-2. Priority Scheduling */
 void 
 checking_priority (void)
@@ -685,3 +738,4 @@ update_donated_priority (void)
     thread_cur->priority = donated->priority;
   }
 }
+/* 1-2. Priority Scheduling */
