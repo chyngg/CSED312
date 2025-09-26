@@ -638,7 +638,7 @@ priority_donate (void)
     if(thread_cur->lock_reason_of_donation == NULL){
       return;
     }
-    else if(thread_cur->lock_reason_of_donation>holder == NULL){
+    else if(thread_cur->lock_reason_of_donation->holder == NULL){
       return;
     }
 
@@ -664,6 +664,7 @@ remove_from_list(struct lock *lock)
     if (thread_temp->lock_reason_of_donation == lock)
         {
           list_remove (&thread_temp->donation_list_elem);
+          thread_temp->lock_reason_of_donation = NULL;
         }
     elem_temp = elem_next_temp;
   }
