@@ -643,13 +643,15 @@ remove_from_list(struct lock *lock)
   struct thread * thread_cur = thread_current ();
   struct list_elem * elem_temp = list_begin(&thread_cur->donation_list);
   struct thread * thread_temp;
+  struct list_elem * elem_next_temp;
   while (elem_temp != list_end(&thread_cur->donation_list)) {
     thread_temp = list_entry(elem_temp, struct thread, donation_list_elem);
+    elem_next_temp = list_next(elem_temp);
     if (thread_temp->lock_reason_of_donation == lock)
         {
           list_remove (&thread_temp->donation_list_elem);
         }
-    elem_temp = list_next(elem_temp);
+    elem_temp = elem_next_temp;
   }
 }
 
