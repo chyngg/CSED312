@@ -203,7 +203,7 @@ lock_acquire (struct lock *lock)
   struct thread * thread_cur = thread_current ();
   if(lock->holder){
     thread_cur->lock_reason_of_donation = lock;
-	  list_insert_ordered(&lock->holder->donation_list, &thread_cur->donation_list_elem, cmp_priority, NULL);
+	  list_insert_ordered(&lock->holder->donation_list, &thread_cur->donation_list_elem, cmp_donation_priority, NULL);
 	  priority_donate();
   }
 

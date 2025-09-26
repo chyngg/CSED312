@@ -616,6 +616,17 @@ cmp_priority (const struct list_elem *elem_1, const struct list_elem *elem_2, vo
   }
 }
 
+bool 
+cmp_donation_priority (const struct list_elem *elem_1, const struct list_elem *elem_2, void *aux UNUSED)
+{
+  if(list_entry(elem_1, struct thread, donation_list_elem)->priority > list_entry(elem_2, struct thread, donation_list_elem)->priority){
+    return true;
+  }
+  else{
+    return false;
+  }
+}
+
 void
 priority_donate (void)
 {
@@ -667,7 +678,7 @@ update_donated_priority (void)
   if (list_empty(&thread_cur->donation_list)) {
     return;
   }
-  list_sort(&thread_cur->donation_list, cmp_priority, NULL);
+  list_sort(&thread_cur->donation_list, cmp_donation_priority, NULL);
   struct thread * donated = list_entry(list_begin(&thread_cur->donation_list), struct thread, donation_list_elem);
   if(donated->priority > thread_cur->priority){
     thread_cur->priority = donated->priority;
