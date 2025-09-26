@@ -623,7 +623,7 @@ thread_awake (int64_t ticks)
 {
   struct list_elem * elem_temp = list_begin(&blocked_list);
   struct thread * thread_temp;
-  while (elem_temp != list_end(&blocked_list)) {
+  while (!list_empty(&blocked_list)) {
     elem_temp = list_begin(&blocked_list);
     thread_temp = list_entry(elem_temp, struct thread, elem);
 
