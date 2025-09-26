@@ -634,15 +634,6 @@ thread_awake (int64_t ticks)
 		  break;
 	  }
   }
-  if (elem_temp != NULL ){
-    thread_temp = list_entry(elem_temp, struct thread, elem);
-
-	  if(thread_temp->tick_designated < ticks){
-		  elem_temp = list_remove(elem_temp);
-	    thread_unblock(thread_temp);
-	  }
-  }
-
 }
 /* 1-1. Alarm Clock */
 
