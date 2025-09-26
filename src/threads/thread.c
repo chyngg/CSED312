@@ -624,7 +624,10 @@ priority_donate (void)
   struct thread * thread_cur = thread_current();
   struct thread * thread_holder;
   for(int depth = 0; depth < depth_max; depth++){
-    if(thread_cur->lock_reason_of_donation != NULL){
+    if(thread_cur->lock_reason_of_donation == NULL){
+      return;
+    }
+    else if(thread_cur->lock_reason_of_donation>holder == NULL){
       return;
     }
 
