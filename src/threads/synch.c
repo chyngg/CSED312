@@ -359,7 +359,7 @@ cmp_semaphore_priority (const struct list_elem *elem_1, const struct list_elem *
   const struct semaphore_elem *sema_1 = list_entry(elem_1, struct semaphore_elem, elem);
   const struct semaphore_elem *sema_2 = list_entry(elem_2, struct semaphore_elem, elem);
 
-  if(list_entry(list_front(&sema_1->semaphore.waiters), struct thread, elem) > list_entry(list_front(&sema_2->semaphore.waiters), struct thread, elem)){
+  if(list_entry(list_front(&sema_1->semaphore.waiters), struct thread, elem)->priority > list_entry(list_front(&sema_2->semaphore.waiters), struct thread, elem)->priority){
     return true;
   }
   else{
