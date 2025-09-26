@@ -89,9 +89,17 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    
+    int tick_designated;                /* 1-1. Alarm Clock */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
+    /* 1-2. Priority Scheduling */
+    int origin_priority;
+    struct lock * lock_reason_of_donation;
+    struct list donation_list;
+    struct list_elem donation_list_elem;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -138,4 +146,18 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+/* 1-1. Alarm Clock */
+bool cmp_blocked_list (struct list_elem * new, struct list_elem * blocked_list_elem, void * aux UNUSED);
+void thread_sleep (int64_t);
+void thread_awake (int64_t);
+
 #endif /* threads/thread.h */
+
+/* 1-2. Priority Scheduling */
+void checking_priority (void);
+bool cmp_priority (const struct list_elem *elem_1, const struct list_elem *elem_2, void *aux UNUSED);
+bool cmp_donation_priority (const struct list_elem *elem_1, const struct list_elem *elem_2, void *aux UNUSED);
+bool cmp_semaphore_priority (const struct list_elem *elem_1, const struct list_elem *elem_2, void *aux UNUSED);
+void priority_donate (void);
+void remove_from_list(struct lock *lock);
+void update_donated_priority (void);
