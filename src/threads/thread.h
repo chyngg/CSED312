@@ -150,6 +150,7 @@ int thread_get_load_avg (void);
 void checking_priority (void);
 bool cmp_priority (const struct list_elem *elem_1, const struct list_elem *elem_2, void *aux UNUSED);
 bool cmp_donation_priority (const struct list_elem *elem_1, const struct list_elem *elem_2, void *aux UNUSED);
+bool cmp_semaphore_priority (const struct list_elem *elem_1, const struct list_elem *elem_2, void *aux UNUSED);
 void priority_donate (void);
 void remove_from_list(struct lock *lock);
 void update_donated_priority (void);
