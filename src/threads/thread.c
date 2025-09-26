@@ -341,8 +341,8 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->origin_priority = new_priority;
-  checking_priority();
   update_donated_priority();
+  checking_priority();
 }
 
 /* Returns the current thread's priority. */
