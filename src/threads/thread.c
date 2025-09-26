@@ -621,12 +621,13 @@ thread_sleep (int64_t ticks)
 void 
 thread_awake (int64_t ticks)
 {
-  struct list_elem * elem_temp = list_begin(&blocked_list);;
+  struct list_elem * elem_temp = list_begin(&blocked_list);
   struct thread * thread_temp;
   while (elem_temp != list_end(&blocked_list)) {
+    elem_temp = list_begin(&blocked_list);
     thread_temp = list_entry(elem_temp, struct thread, elem);
 
-	  if (thread_temp->tick_designated < ticks) {
+	  if (thread_temp->tick_designated <= ticks) {
 		  elem_temp = list_remove(elem_temp);
 	    thread_unblock(thread_temp);
 	  }
