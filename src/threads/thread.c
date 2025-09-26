@@ -595,7 +595,7 @@ cmp_blocked_list
   struct thread* new_entry = list_entry(new, struct thread, elem);
   struct thread* blocked_list_entry = list_entry(blocked_list_elem, struct thread, elem);
 
-  if((blocked_list_entry->tick_designated) < (new_entry->tick_designated)){
+  if((blocked_list_entry->tick_designated) > (new_entry->tick_designated)){
     return true;
   }
   else{
