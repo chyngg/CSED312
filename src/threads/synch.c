@@ -201,6 +201,13 @@ lock_acquire (struct lock *lock)
 
   /* 1-2. Priority Scheduling */
   struct thread * thread_cur = thread_current ();
+
+  if (thread_mlfqs) {
+    sema_down (&lock->semaphore);
+    lock->holder = thread_cur;
+    return;
+  }
+
   if(lock->holder){
     thread_cur->lock_reason_of_donation = lock;
 	  list_insert_ordered(&lock->holder->donation_list, &thread_cur->donation_list_elem, cmp_donation_priority, NULL);
@@ -242,8 +249,10 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
-  remove_from_list(lock);
-  update_donated_priority();
+  if (!thread_mlfqs) {
+    remove_from_list(lock);
+    update_donated_priority();
+  }
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);

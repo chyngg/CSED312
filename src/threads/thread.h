@@ -23,6 +23,9 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+#define LOAD_AVG_DEFAULT 0               /* Default load average. */
+#define NICE_DEFAULT 0                /* Default nice value. */
+#define RECENT_CPU_DEFAULT 0           /* Default recent_cpu value. */
 
 /* A kernel thread or user process.
 
@@ -101,6 +104,10 @@ struct thread
     struct list donation_list;
     struct list_elem donation_list_elem;
 
+    /* 1-3. Advanced Scheduler */
+    int nice;
+    int recent_cpu;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -161,3 +168,9 @@ bool cmp_semaphore_priority (const struct list_elem *elem_1, const struct list_e
 void priority_donate (void);
 void remove_from_list(struct lock *lock);
 void update_donated_priority (void);
+
+void mlfqs_calculate_priority (struct thread *t);
+void mlfqs_calculate_recent_cpu (void);
+void mlfqs_calculate_load_avg (void);
+void mlfqs_new_priority (void);
+void mlfqs_increment_recent_cpu (struct thread *t);
