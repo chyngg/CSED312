@@ -68,7 +68,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_insert_ordered (&sema->waiters, &thread_current ()->elem, cmp_priority, NULL);
+      list_insert_ordered (&sema->waiters, &thread_current ()->elem, cmp_priority, NULL); /* 1-2. Priority Scheduling */
       thread_block ();
     }
   sema->value--;
@@ -114,13 +114,13 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) {
-    list_sort (&sema->waiters, cmp_priority, NULL);
+    list_sort (&sema->waiters, cmp_priority, NULL); /* 1-2. Priority Scheduling */
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
   }
   sema->value++;
   intr_set_level (old_level);
-  checking_priority();
+  checking_priority(); /* 1-2. Priority Scheduling */
 }
 
 static void sema_test_helper (void *sema_);
@@ -250,8 +250,8 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!thread_mlfqs) {
-    remove_from_list(lock);
-    update_donated_priority();
+    remove_from_list(lock); /* 1-2. Priority Scheduling */
+    update_donated_priority(); /* 1-2. Priority Scheduling */
   }
 
   lock->holder = NULL;
@@ -274,7 +274,7 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
-    int priority;                       // for checking priority at list_insert_ordered
+    int priority;                       // for checking priority at list_insert_ordered /* 1-2. Priority Scheduling */
   };
 
 /* Initializes condition variable COND.  A condition variable
@@ -319,8 +319,8 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  waiter.priority = thread_current()->priority; // for checking priority at list_insert_ordered
-  list_insert_ordered (&cond->waiters, &waiter.elem, cmp_semaphore_priority, NULL);
+  waiter.priority = thread_current()->priority; // for checking priority at list_insert_ordered /* 1-2. Priority Scheduling */
+  list_insert_ordered (&cond->waiters, &waiter.elem, cmp_semaphore_priority, NULL); /* 1-2. Priority Scheduling */
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
@@ -342,7 +342,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)){
-    list_sort (&cond->waiters, cmp_semaphore_priority, NULL);
+    // list_sort (&cond->waiters, cmp_semaphore_priority, NULL); /* 1-2. Priority Scheduling */
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);
   }
@@ -364,6 +364,7 @@ cond_broadcast (struct condition *cond, struct lock *lock)
     cond_signal (cond, lock);
 }
 
+/* 1-2. Priority Scheduling */
 bool 
 cmp_semaphore_priority (const struct list_elem *elem_1, const struct list_elem *elem_2, void *aux UNUSED)
 {
@@ -377,3 +378,4 @@ cmp_semaphore_priority (const struct list_elem *elem_1, const struct list_elem *
     return false;
   }
 }
+/* 1-2. Priority Scheduling */
