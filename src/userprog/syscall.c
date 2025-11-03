@@ -122,7 +122,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       int fd = syscall_argu[0];
       sys_tell (fd);
 			break;
-      
+
     // void sys_close (int fd)
 		case SYS_CLOSE:
       int syscall_argu[1] = {0, };
