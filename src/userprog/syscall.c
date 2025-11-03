@@ -18,3 +18,12 @@ syscall_handler (struct intr_frame *f UNUSED)
   printf ("system call!\n");
   thread_exit ();
 }
+
+/* 2-1 Process Termination Message */
+void sys_exit (int exit_code)
+{
+  struct thread *cur = thread_current ();
+  cur->exit_code = exit_code;
+  printf ("%s: exit(%d)\n", thread_name(), exit_code);
+  thread_exit ();
+}
