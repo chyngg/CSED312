@@ -38,6 +38,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
 
   int syscall_num = *(int *)(f->esp);
+  int syscall_argu[3] = {0, };
 
   switch(syscall_num){
     // void sys_halt (void) NO_RETURN
@@ -47,104 +48,74 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     // void sys_exit (int status) NO_RETURN
 		case SYS_EXIT:
-      int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
-      int status = syscall_argu[0];
-			sys_exit (status);
+			sys_exit (syscall_argu[0]);
 			break;
 
     // pid_t sys_exec (const char *file)
 		case SYS_EXEC:
-      int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
-      const char * file = (const char *) syscall_argu[0];
-			sys_exec (file);
+			sys_exec ((const char *) syscall_argu[0]);
 			break;
 
     // int sys_wait (pid_t)
     case SYS_WAIT:
-     int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
-      pid_t pid = (pid_t) syscall_argu[0];
-			sys_wait (pid);
+			sys_wait ((pid_t) syscall_argu[0]);
 			break;
 
     // bool sys_create (const char *file, unsigned initial_size)
     case SYS_CREATE:
-      int syscall_argu[2] = {0, };
       extract_arguments(f, syscall_argu, 2);
-      const char * file = (const char *) syscall_argu[0];
-      unsigned initial_size = (unsigned) syscall_argu[1];
-			sys_create (file, initial_size);
+			sys_create ((const char *) syscall_argu[0], (unsigned) syscall_argu[1]);
 			break;
 
     // bool sys_remove (const char *file)
     case SYS_REMOVE:
-      int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
-      const char * file = (const char *) syscall_argu[0];
-			sys_remove (file);
+			sys_remove ((const char *) syscall_argu[0]);
 			break;
 
     // int sys_open (const char *file)
     case SYS_OPEN:
-      int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
-      const char * file = (const char *) syscall_argu[0];
-      sys_open (file);
+      sys_open ((const char *) syscall_argu[0]);
 			break;
 
     // int sys_filesize (int fd)
     case SYS_FILESIZE:
-      int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
-      int fd = syscall_argu[0];
-      sys_filesize (fd);
+      sys_filesize (syscall_argu[0]);
 			break;
 
     // int sys_read (int fd, void *buffer, unsigned length)
     case SYS_READ:
-      int syscall_argu[3] = {0, };
       extract_arguments(f, syscall_argu, 3);
-      int fd = syscall_argu[0];
-      void * buffer = (void *) syscall_argu[1];
-      unsigned length = (unsigned) syscall_argu[2];
-      sys_read (fd, buffer, length);
+      sys_read (syscall_argu[0], (void *) syscall_argu[1], (unsigned) syscall_argu[2]);
 			break;
 
     // int sys_write (int fd, const void *buffer, unsigned length)
     case SYS_WRITE:
-      int syscall_argu[3] = {0, };
       extract_arguments(f, syscall_argu, 3);
-      int fd = syscall_argu[0];
-      void * buffer = (void *) syscall_argu[1];
-      unsigned length = (unsigned) syscall_argu[2];
-      sys_write (fd, buffer, length);
+      sys_write (syscall_argu[0], (void *) syscall_argu[1], (unsigned) syscall_argu[2]);
 			break;
 
     // void sys_seek (int fd, unsigned position)
     case SYS_SEEK:
-      int syscall_argu[2] = {0, };
       extract_arguments(f, syscall_argu, 2);
-      int fd = syscall_argu[0];
-      unsigned position = (unsigned) syscall_argu[1];
-      sys_seek (fd, position);
+      sys_seek (syscall_argu[0], (unsigned) syscall_argu[1]);
 			break;
 
     // unsigned sys_tell (int fd)
     case SYS_TELL:
       int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
-      int fd = syscall_argu[0];
-      sys_tell (fd);
+      sys_tell (syscall_argu[0]);
 			break;
 
     // void sys_close (int fd)
 		case SYS_CLOSE:
-      int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
-      int fd = syscall_argu[0];
-      sys_close (fd);
 			break;
 	}
 }
