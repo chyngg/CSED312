@@ -111,6 +111,10 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    
+    /* 2-3. System Call */
+    struct pcb * pcb;
+    struct list child_list;
 #endif
 
     /* Owned by thread.c. */

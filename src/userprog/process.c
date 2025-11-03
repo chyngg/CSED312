@@ -61,6 +61,14 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+#ifdef USERPROG
+  /* 2-3. System Call */
+  //thread_current()->pcb.pid;
+  //struct pcb * parent;
+  //int fd[];
+  //list_init(thread_current()->child_list);
+#endif
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
