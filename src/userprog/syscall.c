@@ -133,7 +133,8 @@ void sys_halt (void){
 }
 
 void sys_exit (int status){
-  thread_exit ();
+  thread_current()->status = status;
+  thread_exit();
 }
 
 pid_t sys_exec (const char *file){

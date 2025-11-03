@@ -113,18 +113,13 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 
     /* 2-3. System Call */
-    struct pcb * pcb;
-    struct list child_list;
-
-
-    struct pcb {
-
-    /* 2-3. System Call */
     pid_t pid;
-    struct pcb * parent;
+    int status; // exit status
+
+    struct thread * parent;
     struct list fd;
+    struct list child_list;
     struct list_elem pcb_elem;
-};
 #endif
 
     /* Owned by thread.c. */
