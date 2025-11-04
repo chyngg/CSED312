@@ -6,6 +6,8 @@
 
 #include "threads/vaddr.h"
 
+struct lock file_system_lock;
+
 static void syscall_handler (struct intr_frame *);
 void sys_halt (void);
 void sys_exit (int status);
@@ -128,54 +130,161 @@ void extract_arguments (struct intr_frame *f, int *syscall_argu, int argu_num){
   }
 }
 
+struct file * access_file (int fd){
+  if(2 <= fd && fd < thread_current()->fd_next){
+    return thread_current()->fd_list[fd];
+  }
+  else{
+    return NULL; 
+  }
+}
+
 void sys_halt (void){
   shutdown_power_off();
 }
 
 void sys_exit (int status){
-  thread_current()->status = status;
+  thread_current()->exit_status = status;
   thread_exit();
 }
 
 pid_t sys_exec (const char *file){
+  pid_t pid = process_execute(file);
+  struct thread * child = get_child_process(pid);
   
+  if (!child || !child->sucess) {
+    return -1;
+  }
+  return pid;
 }
 
-int sys_wait (pid_t){
-  
+int sys_wait (pid_t pid){
+  int exit_status = process_wait(pid);
+  return exit_status;
 }
 
 bool sys_create (const char *file, unsigned initial_size){
-  
+  lock_acquire(&file_system_lock);
+  bool success = filesys_create (file, initial_size);
+  lock_release(&file_system_lock);
+  return success;
 }
 
 bool sys_remove (const char *file){
-
+  lock_acquire(&file_system_lock);
+  bool success = filesys_remove (file);
+  lock_release(&file_system_lock);
+  return success;
 }
 
 int sys_open (const char *file){
-
+  lock_acquire(&file_system_lock);
+  struct file * f = filesys_open(file);
+  if(!f){
+    lock_release(&file_system_lock);
+    return -1;
+  }
+  lock_release(&file_system_lock);
+  int fd = thread_current()->fd_next;
+  thread_current()->fd_list[fd] = f;
+  thread_current()->fd_next++;
+  return fd;
 }
 
 int sys_filesize (int fd){
-  
+  lock_acquire(&file_system_lock);
+  struct file * f = access_file (fd);
+  if(!f){
+    lock_release(&file_system_lock);
+    return -1;
+  }
+  lock_release(&file_system_lock);
+  return file_length(f);
 }
 
 int sys_read (int fd, void *buffer, unsigned length){
-  
+  int length_read = 0;
+  lock_acquire(&file_system_lock);
+  if(fd == 0){ // stdin 
+    for (int i = 0; i < length;i++){
+      ((char*)buffer)[i]=input_getc();
+      if(((char*)buffer)[i] == '\0')
+      {
+        break;
+      }
+      length_read = i;
+    }
+  }
+  else if(fd == 1){
+    lock_release(&file_system_lock);
+    return -1;
+  }
+  else{
+    struct file * f = access_file (fd);
+    if(!f){
+      lock_release(&file_system_lock);
+      return -1;
+    }
+    length_read = file_read (f, buffer, length);
+  }
+  lock_release(&file_system_lock);
+  return length_read;
 }
 
 int sys_write (int fd, const void *buffer, unsigned length){
-  
+  int length_write = 0;
+  lock_acquire(&file_system_lock);
+  if(fd == 0){ // stdin 
+    lock_release(&file_system_lock);
+    return -1;
+  }
+  else if(fd == 1){
+    putbuf(buffer, length);
+    length_write = length;
+  }
+  else{
+    struct file * f = access_file (fd);
+    if(!f){
+      lock_release(&file_system_lock);
+      return -1;
+    }
+    length_write = file_write (f, buffer, length);
+  }
+  lock_release(&file_system_lock);
+  return length_write;
 }
 
 void sys_seek (int fd, unsigned position){
-  
+  lock_acquire(&file_system_lock);
+  struct file * f = access_file (fd);
+  if(!f){
+    lock_release(&file_system_lock);
+    return;
+  }
+  file_seek (f, position);
+  lock_release(&file_system_lock);
+  return;
 }
-unsigned sys_tell (int fd){
 
+unsigned sys_tell (int fd){
+  lock_acquire(&file_system_lock);
+  struct file * f = access_file (fd);
+  if(!f){
+    lock_release(&file_system_lock);
+    return -1; // ?
+  }
+  unsigned position = file_tell (f);
+  lock_release(&file_system_lock);
+  return position;
 }
 
 void sys_close (int fd){
-  
+  ock_acquire(&file_system_lock);
+  struct file * f = access_file (fd);
+  if(!f){
+    lock_release(&file_system_lock);
+    return;
+  }
+  process_close_file(fd);
+  lock_release(&file_system_lock);
 }

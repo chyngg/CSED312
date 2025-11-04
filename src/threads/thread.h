@@ -116,13 +116,14 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 
     /* 2-3. System Call */
-    pid_t pid;
+    // pid_t pid;
     int exit_status; // exit status
-
     struct thread * parent;
-    struct list fd;
+    struct file ** fd_list;
+    int fd_next;
     struct list child_list;
-    struct list_elem pcb_elem;
+    struct list_elem child_list_elem;
+    bool success;
 #endif
 
     /* Owned by thread.c. */

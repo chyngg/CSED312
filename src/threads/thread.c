@@ -205,6 +205,19 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+#ifdef USERPROG
+  /* 2-3. System Call */
+  // t->pid = tid;
+  t->exit_status = NULL; // exit status
+  t->parent = thread_current();
+  list_push_back(&(thread_current()->child_list), &(t->child_list_elem));
+  t->fd_list = palloc_get_page (PAL_ZERO);
+  t->fd_list -= 2;
+  fd_next = 2; // 0(stdin) and 1(stdout) are reserved for the console
+  list_init(t->child_list);
+  t->success = false;
+#endif
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -800,4 +813,25 @@ update_donated_priority (void)
   if(donated->priority > thread_cur->priority){
     thread_cur->priority = donated->priority;
   }
+}
+/* 1-2. Priority Scheduling */
+
+/* 2-3. System Call */
+struct thread * get_child_process (tid_t child_tid)
+{
+
+  struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  for (e = list_begin (&thread_current()->child_list); e != list_end (&thread_current()->child_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, child_list_elem);
+      if (t->tid == child_tid){
+        return t;
+      }
+    }
+  
+  return NULL;
 }
