@@ -19,6 +19,9 @@ enum thread_status
 typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
 
+/* 2-3. System Call */
+typedef int pid_t;
+
 /* Thread priorities. */
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
@@ -114,7 +117,7 @@ struct thread
 
     /* 2-3. System Call */
     pid_t pid;
-    int status; // exit status
+    int exit_status; // exit status
 
     struct thread * parent;
     struct list fd;
