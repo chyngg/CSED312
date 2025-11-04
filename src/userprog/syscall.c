@@ -6,7 +6,7 @@
 
 #include "threads/vaddr.h"
 
-struct lock file_system_lock;
+static struct lock file_system_lock;
 
 static void syscall_handler (struct intr_frame *);
 void sys_halt (void);

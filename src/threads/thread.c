@@ -213,8 +213,8 @@ thread_create (const char *name, int priority,
   list_push_back(&(thread_current()->child_list), &(t->child_list_elem));
   t->fd_list = palloc_get_page (PAL_ZERO);
   t->fd_list -= 2;
-  fd_next = 2; // 0(stdin) and 1(stdout) are reserved for the console
-  list_init(t->child_list);
+  t->fd_next = 2; // 0(stdin) and 1(stdout) are reserved for the console
+  list_init (&t->child_list);
   t->success = false;
 #endif
 
