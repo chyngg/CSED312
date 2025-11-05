@@ -23,7 +23,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 void sys_exit (int exit_code)
 {
   struct thread *cur = thread_current ();
-  cur->exit_code = exit_code;
+  cur->exit_status = exit_code;
   printf ("%s: exit(%d)\n", thread_name(), exit_code);
   thread_exit ();
 }

@@ -121,7 +121,7 @@ thread_start (void)
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
-  load_avg = int_to_fp(LOAD_AVG_DEFAULT);;
+  load_avg = int_to_fp(LOAD_AVG_DEFAULT);
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -204,6 +204,11 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
+
+  #ifdef USERPROG
+    sema_init(&(t->sema_exec), 0);
+    t->loaded = false;
+  #endif
 
   /* Add to run queue. */
   thread_unblock (t);
