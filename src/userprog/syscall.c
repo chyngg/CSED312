@@ -4,6 +4,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 /* 2-3. System Call */
+#include "threads/synch.h"
+#include "threads/vaddr.h"
 
 static struct lock file_system_lock;
 
