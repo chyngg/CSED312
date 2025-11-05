@@ -3,8 +3,9 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-
+/* 2-3. System Call */
 #include "threads/vaddr.h"
+#include "threads/synch.h" 
 
 static struct lock file_system_lock;
 
@@ -28,6 +29,7 @@ void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init(&file_system_lock); 
 }
 
 static void
@@ -152,7 +154,7 @@ pid_t sys_exec (const char *file){
   pid_t pid = process_execute(file);
   struct thread * child = get_child_process(pid);
   
-  if (!child || !child->sucess) {
+  if (!child || !child->success) {
     return -1;
   }
   return pid;
@@ -279,12 +281,14 @@ unsigned sys_tell (int fd){
 }
 
 void sys_close (int fd){
-  ock_acquire(&file_system_lock);
+  lock_acquire(&file_system_lock);
   struct file * f = access_file (fd);
   if(!f){
     lock_release(&file_system_lock);
     return;
   }
-  process_close_file(fd);
+  file_close(fd);
+  thread_current()->fd_list[fd] = NULL;
   lock_release(&file_system_lock);
 }
+/* 2-3. System Call */
