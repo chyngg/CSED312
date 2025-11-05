@@ -4,8 +4,6 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 /* 2-3. System Call */
-#include "threads/vaddr.h"
-#include "threads/synch.h" 
 
 static struct lock file_system_lock;
 
@@ -59,49 +57,49 @@ syscall_handler (struct intr_frame *f UNUSED)
     // pid_t sys_exec (const char *file)
 		case SYS_EXEC:
       extract_arguments(f, syscall_argu, 1);
-			sys_exec ((const char *) syscall_argu[0]);
+			f->eax = sys_exec ((const char *) syscall_argu[0]);
 			break;
 
     // int sys_wait (pid_t)
     case SYS_WAIT:
       extract_arguments(f, syscall_argu, 1);
-			sys_wait ((pid_t) syscall_argu[0]);
+			f->eax = sys_wait ((pid_t) syscall_argu[0]);
 			break;
 
     // bool sys_create (const char *file, unsigned initial_size)
     case SYS_CREATE:
       extract_arguments(f, syscall_argu, 2);
-			sys_create ((const char *) syscall_argu[0], (unsigned) syscall_argu[1]);
+			f->eax = sys_create ((const char *) syscall_argu[0], (unsigned) syscall_argu[1]);
 			break;
 
     // bool sys_remove (const char *file)
     case SYS_REMOVE:
       extract_arguments(f, syscall_argu, 1);
-			sys_remove ((const char *) syscall_argu[0]);
+			f->eax = sys_remove ((const char *) syscall_argu[0]);
 			break;
 
     // int sys_open (const char *file)
     case SYS_OPEN:
       extract_arguments(f, syscall_argu, 1);
-      sys_open ((const char *) syscall_argu[0]);
+      f->eax = sys_open ((const char *) syscall_argu[0]);
 			break;
 
     // int sys_filesize (int fd)
     case SYS_FILESIZE:
       extract_arguments(f, syscall_argu, 1);
-      sys_filesize (syscall_argu[0]);
+      f->eax = sys_filesize (syscall_argu[0]);
 			break;
 
     // int sys_read (int fd, void *buffer, unsigned length)
     case SYS_READ:
       extract_arguments(f, syscall_argu, 3);
-      sys_read (syscall_argu[0], (void *) syscall_argu[1], (unsigned) syscall_argu[2]);
+      f->eax = sys_read (syscall_argu[0], (void *) syscall_argu[1], (unsigned) syscall_argu[2]);
 			break;
 
     // int sys_write (int fd, const void *buffer, unsigned length)
     case SYS_WRITE:
       extract_arguments(f, syscall_argu, 3);
-      sys_write (syscall_argu[0], (void *) syscall_argu[1], (unsigned) syscall_argu[2]);
+      f->eax = sys_write (syscall_argu[0], (void *) syscall_argu[1], (unsigned) syscall_argu[2]);
 			break;
 
     // void sys_seek (int fd, unsigned position)
@@ -114,12 +112,13 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_TELL:
       int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
-      sys_tell (syscall_argu[0]);
+      f->eax = sys_tell (syscall_argu[0]);
 			break;
 
     // void sys_close (int fd)
 		case SYS_CLOSE:
       extract_arguments(f, syscall_argu, 1);
+      sys_close (syscall_argu[0]);
 			break;
 	}
 }
