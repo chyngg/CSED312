@@ -31,6 +31,11 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
+  // 2-2 Argument Passing
+  char *fn_copy2;
+  char *fn_save;
+  char *filename;
+
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -38,10 +43,24 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  // 2-2 Argument Passing
+  fn_copy2 = palloc_get_page (0);
+  strlcpy(fn_copy2, file_name, PGSIZE);
+  filename = strtok_r(fn_copy2, " ", &fn_save);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (filename, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+
+  // 2-2 Argument Passing
+  struct list_elem *e;
+  struct thread *child_thread;
+  for (e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
+    child_thread = list_entry(e, struct thread, child_elem);
+    if (child_thread->exit_status == -1) 
+      return process_wait(tid);
+  }
   return tid;
 }
 
@@ -54,13 +73,33 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  // 2-2 Argument Passing
+  char *fn_copy = palloc_get_page (0);
+  strlcpy(fn_copy, file_name, PGSIZE);
+  int argc;
+  char **argv;
+
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
-  thread_current()->success = success; /* 2-3. System Call */
+  
+  /* 2-2 Argument Passing */
+  argv = palloc_get_page(0);
+  argc = fn_to_argv(argv, fn_copy);
+
+  success = load (argv[0], &if_.eip, &if_.esp);
+
+  thread_current()->loaded = success;
+  if (success) 
+    stack_argv(argv, argc, &if_.esp);
+  sema_up(&thread_current()->sema_exec);
+
+  palloc_free_page(argv);
+  palloc_free_page(fn_copy);
+  /* 2-2 Argument Passing */
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -463,4 +502,57 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+void fn_to_argv(char **argv, char *fn_copy) {
+  int argc = 0;
+  char *token;
+  char *save_ptr;
+
+  for (token = strtok_r(fn_copy, " ", &save_ptr); token != NULL;
+       token = strtok_r(NULL, " ", &save_ptr)) {
+    argv[argc++] = token;
+  }
+  return argc;
+}
+
+void stack_argv(char **argv, int argc, void **esp) {
+  int i = 0;
+  int length = 0;
+  void *arg_addresses[argc];
+
+  // Push arguments onto the stack in reverse order
+  for (i = argc - 1; i >= 0; i--) {
+    length = strlen(argv[i]);
+    *esp -= length + 1;
+    strlcpy(*esp, argv[i], length + 1);
+    argv[i] = *esp;
+  }
+
+  // Word-align the stack pointer
+  uintptr_t esp_val = (uintptr_t)(*esp);
+  esp_val &= 0xfffffffc; // Align to 4 bytes
+  *esp = (void *)esp_val;
+
+  // Push null sentinel
+  *esp -= 4;
+  **(uint32_t **)(esp) = 0;
+
+  // Push addresses of arguments
+  for (i = argc - 1; i >= 0; i--) {
+    *esp -= 4;
+    **(uint32_t **)(esp) = argv[i];
+  }
+
+  // Push argv (address of first argument)
+  *esp -= 4;
+  **(uint32_t **)(esp) = *esp + 4;
+
+  // Push argc
+  *esp -= 4;
+  **(uint32_t **)(esp) = argc;
+
+  // Push fake return address
+  *esp -= 4;
+  **(uint32_t **)(esp) = 0;
 }

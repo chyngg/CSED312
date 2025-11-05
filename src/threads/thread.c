@@ -121,7 +121,7 @@ thread_start (void)
 
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
-  load_avg = int_to_fp(LOAD_AVG_DEFAULT);;
+  load_avg = int_to_fp(LOAD_AVG_DEFAULT);
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -215,8 +215,12 @@ thread_create (const char *name, int priority,
   t->fd_list -= 2;
   t->fd_next = 2; // 0(stdin) and 1(stdout) are reserved for the console
   list_init (&t->child_list);
-  t->success = false;
-#endif
+  /* 2-3. System Call */
+  /* 2-2. Process Synchronization */
+  sema_init(&(t->sema_exec), 0);
+  t->loaded = false;
+  /* 2-2. Process Synchronization */
+  #endif
 
   /* Add to run queue. */
   thread_unblock (t);

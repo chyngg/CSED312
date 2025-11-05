@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
+#include "threads/synch.h"
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -117,13 +117,14 @@ struct thread
 
     /* 2-3. System Call */
     // pid_t pid;
-    int exit_status; // exit status
     struct thread * parent;
     struct file ** fd_list;
     int fd_next;
-    struct list child_list;
     struct list_elem child_list_elem;
-    bool success;
+    struct list child_list;
+    struct semaphore sema_exec;    /* 2-2. Process Synchronization */
+    bool loaded;                    /* 2-2. Process Synchronization */
+    int exit_status;               /* 2-2. Process Synchronization */
 #endif
 
     /* Owned by thread.c. */

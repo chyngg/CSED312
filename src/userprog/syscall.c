@@ -148,6 +148,7 @@ void sys_halt (void){
 
 void sys_exit (int status){
   thread_current()->exit_status = status;
+  printf ("%s: exit(%d)\n", thread_name(), status);
   thread_exit();
 }
 
@@ -155,7 +156,7 @@ pid_t sys_exec (const char *file){
   pid_t pid = process_execute(file);
   struct thread * child = get_child_process(pid);
   
-  if (!child || !child->success) {
+  if (!child || !child->loaded) {
     return -1;
   }
   return pid;
