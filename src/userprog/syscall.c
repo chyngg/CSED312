@@ -283,7 +283,7 @@ int sys_read (int fd, void *buffer, unsigned length){
   }
 
   int length_read = 0;
-  lock_acquire(&file_system_lock);
+  
   if(fd == 0){ // stdin 
     for (int i = 0; i < length;i++){
       ((char*)buffer)[i]=input_getc();
@@ -291,18 +291,19 @@ int sys_read (int fd, void *buffer, unsigned length){
     }
   }
   else if(fd == 1){
-    lock_release(&file_system_lock);
     return -1;
   }
   else{
+    lock_acquire(&file_system_lock);
     struct file * f = access_file (fd);
     if(!f){
       lock_release(&file_system_lock);
       return -1;
     }
     length_read = file_read (f, buffer, length);
+    lock_release(&file_system_lock);
   }
-  lock_release(&file_system_lock);
+
   return length_read;
 }
 
@@ -312,9 +313,8 @@ int sys_write (int fd, const void *buffer, unsigned length){
   }
   
   int length_write = 0;
-  lock_acquire(&file_system_lock);
+  
   if(fd == 0){ // stdin 
-    lock_release(&file_system_lock);
     return -1;
   }
   else if(fd == 1){
@@ -322,14 +322,16 @@ int sys_write (int fd, const void *buffer, unsigned length){
     length_write = length;
   }
   else{
+    lock_acquire(&file_system_lock);
     struct file * f = access_file (fd);
     if(!f){
       lock_release(&file_system_lock);
       return -1;
     }
     length_write = file_write (f, buffer, length);
+    lock_release(&file_system_lock);
   }
-  lock_release(&file_system_lock);
+  
   return length_write;
 }
 
