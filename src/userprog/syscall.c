@@ -114,7 +114,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     // unsigned sys_tell (int fd)
     case SYS_TELL:
-      int syscall_argu[1] = {0, };
       extract_arguments(f, syscall_argu, 1);
       f->eax = sys_tell (syscall_argu[0]);
 			break;
@@ -149,10 +148,15 @@ bool is_mapped_user_vaddr (const void *vaddr, size_t size){
     temp = (const uint8_t *)pg_round_down((void *)temp) + PGSIZE; // 다음 페이지로
   }
 
+  return true;
+
 }
 
 void extract_arguments (struct intr_frame *f, int *syscall_argu, int argu_num){
   void *vaddr = f->esp + 4;
+  if(!is_mapped_user_vaddr(vaddr, argu_num * (int)sizeof(int))){
+    sys_exit (-1);
+  }
   for (int i = 0; i < argu_num; i++){
     syscall_argu[i] = *(int *)(vaddr);
     vaddr += 4;
