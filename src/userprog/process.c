@@ -48,13 +48,29 @@ process_execute (const char *file_name)
   strlcpy(fn_copy2, file_name, PGSIZE);
   filename = strtok_r(fn_copy2, " ", &fn_save);
 
+  /* 2-2 Argument Passing - process_wait */
+  // parent context
+  struct wait_status *ws = palloc_get_page(0);
+  if (!ws) return TID_ERROR;
+  ws->tid = TID_ERROR;
+  ws->exit_code = -1;
+  ws->waited = false;
+  sema_init(&ws->sema, 0);
+  list_push_back(&thread_current()->child_list, &ws->elem);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (filename, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR){
     palloc_free_page (fn_copy); 
-  
-  /* 2-2. Argument Passing */
+    list_remove(&ws->elem); palloc_free_page(ws);
+  }
+  ws->tid = tid;
   struct thread *child = get_child_process(tid);
+  child->wait_status = ws;
+  /* 2-2 Argument Passing - process_wait */
+
+  /* 2-2. Argument Passing */
+  //struct thread *child = get_child_process(tid);
   if (child) {
     sema_down(&child->sema_exec);
     if (!child->loaded) {
@@ -142,23 +158,26 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid) 
 {
-    /* 2-2 Argument Passing */
+  /* 2-2 Argument Passing - process_wait */
   struct thread *cur = thread_current();
-  struct thread *child = get_child_process(child_tid);
-  if (child) {
-    if (child->waited) {
-      return -1;
-    }
-    child->waited = true;
+  struct wait_status *ws = NULL;
 
-    sema_down(&child->sema_wait);
-    
-    int status = child->exit_status;
-
-    list_remove(&child->child_list_elem);
-    return status;
+  struct list_elem *e;
+  for (e = list_begin(&cur->child_list); e != list_end(&cur->child_list); e = list_next(e)) {
+    struct wait_status *x = list_entry(e, struct wait_status, elem);
+    if (x->tid == child_tid) { ws = x; break; }
   }
-  /* 2-2. Argument Passing */
+  if (!ws) return -1;
+  if (ws->waited) return -1;
+  ws->waited = true;
+
+  sema_down(&ws->sema);
+  int status = ws->exit_code;
+
+  list_remove(&ws->elem);
+  palloc_free_page(ws);
+  return status;
+  /* 2-2 Argument Passing - process_wait */
 
   return -1;
 }
@@ -201,11 +220,12 @@ process_exit (void)
   }
   /* 2-3. System Call */
 
-  /* 2-2. Argument Passing */
-  if (cur->parent != NULL) {
-    sema_up(&cur->sema_wait);
+  /* 2-2 Argument Passing - process_wait */
+  if (cur->wait_status) {
+    cur->wait_status->exit_code = cur->exit_status;
+    sema_up(&cur->wait_status->sema);
   }
-  /* 2-2. Argument Passing */
+  /* 2-2 Argument Passing - process_wait */
 }
 
 /* Sets up the CPU for running user code in the current
