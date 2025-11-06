@@ -163,6 +163,24 @@ void extract_arguments (struct intr_frame *f, int *syscall_argu, int argu_num){
   }
 }
 
+bool is_valid_str(const char *str) {
+  if (str == NULL) {
+    return false;
+  }
+  const char *temp = str;
+  for (;;) {
+    if(!is_mapped_user_vaddr(temp, 1)){
+      return false;
+    }
+    if (*temp == '\0'){
+      break;
+    }
+    temp++;
+  }
+  
+  return true;
+}
+
 struct file * access_file (int fd){
   if(2 <= fd && fd < thread_current()->fd_next){
     return thread_current()->fd_list[fd];
@@ -183,6 +201,9 @@ void sys_exit (int status){
 }
 
 pid_t sys_exec (const char *file){
+  if(!is_valid_str(file)){
+    sys_exit (-1);
+  }
   pid_t pid = process_execute(file);
   struct thread * child = get_child_process(pid);
   
@@ -198,6 +219,9 @@ int sys_wait (pid_t pid){
 }
 
 bool sys_create (const char *file, unsigned initial_size){
+  if(!is_valid_str(file)){
+    sys_exit (-1);
+  }
   lock_acquire(&file_system_lock);
   bool success = filesys_create (file, initial_size);
   lock_release(&file_system_lock);
@@ -205,6 +229,9 @@ bool sys_create (const char *file, unsigned initial_size){
 }
 
 bool sys_remove (const char *file){
+  if(!is_valid_str(file)){
+    sys_exit (-1);
+  }
   lock_acquire(&file_system_lock);
   bool success = filesys_remove (file);
   lock_release(&file_system_lock);
@@ -212,6 +239,9 @@ bool sys_remove (const char *file){
 }
 
 int sys_open (const char *file){
+  if(!is_valid_str(file)){
+    sys_exit (-1);
+  }
   lock_acquire(&file_system_lock);
   struct file * f = filesys_open(file);
   if(!f){
