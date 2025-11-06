@@ -53,7 +53,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   
-  // 2-2 Argument Passing
+  /* 2-2. Argument Passing */
   struct thread *child = get_child_process(tid);
   if (child) {
     sema_down(&child->sema_exec);
@@ -75,6 +75,7 @@ process_execute (const char *file_name)
   
   palloc_free_page (fn_copy2);
   return tid;
+  /* 2-2. Argument Passing */
 }
 
 /* A thread function that loads a user process and starts it
@@ -167,6 +168,20 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  /* 2-3. System Call */
+  // should clean fd_list 
+  if(cur->fd_list){
+    for(int fd = 2; fd < cur->fd_next; fd++){
+      if(cur->fd_list[fd]){
+        file_close(cur->fd_list[fd]);
+        cur->fd_list[fd] = NULL;
+      }
+    }
+    palloc_free_page(cur->fd_list);
+    cur->fd_list = NULL;
+  }
+  /* 2-3. System Call */
 }
 
 /* Sets up the CPU for running user code in the current

@@ -156,6 +156,14 @@ page_fault (struct intr_frame *f)
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
-  kill (f);
+   
+   /* 2. Project 2 */
+   // at useer moode, all exceptions(including page fault) shoould call exit(-1)
+   if (user) {
+      sys_exit(-1);
+   } else {
+      kill (f);
+   }
+   /* 2. Project 2 */
 }
 
