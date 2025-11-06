@@ -205,23 +205,6 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-#ifdef USERPROG
-  /* 2-3. System Call */
-  // t->pid = tid;
-  t->exit_status = NULL; // exit status
-  t->parent = thread_current();
-  list_push_back(&(thread_current()->child_list), &(t->child_list_elem));
-  t->fd_list = palloc_get_page (PAL_ZERO);
-  t->fd_list -= 2;
-  t->fd_next = 2; // 0(stdin) and 1(stdout) are reserved for the console
-  list_init (&t->child_list);
-  /* 2-3. System Call */
-  /* 2-2. Process Synchronization */
-  sema_init(&(t->sema_exec), 0);
-  t->loaded = false;
-  /* 2-2. Process Synchronization */
-  #endif
-
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -559,6 +542,32 @@ init_thread (struct thread *t, const char *name, int priority)
   /* 1-3. Advanced Scheduler */
   t->nice = 0;
   t->recent_cpu = int_to_fp(0);
+
+#ifdef USERPROG
+  /* 2-3. System Call */
+  // t->pid = tid;
+  t->exit_status = 0; // exit status
+  // t->parent = NULL;
+  t->fd_list = palloc_get_page (PAL_ZERO);
+  t->fd_next = 2; // 0(stdin) and 1(stdout) are reserved for the console
+  list_init (&t->child_list);
+
+  if (t != initial_thread) {
+    t->parent = thread_current();
+    if (t->parent != NULL) {
+      list_push_back(&t->parent->child_list, &t->child_list_elem);
+    }
+  } else {
+    t->parent = NULL;
+  }
+
+  /* 2-3. System Call */
+
+  /* 2-2. Process Synchronization */
+  sema_init(&(t->sema_exec), 0);
+  t->loaded = false;
+  /* 2-2. Process Synchronization */
+#endif
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -734,7 +743,15 @@ checking_priority (void)
 
   if(thread_get_priority() < list_entry(list_front(&ready_list),struct thread, elem)->priority)
   {
-    thread_yield();
+    /* 2-3. System Call */
+    if (intr_context()) {
+      /* inside of interrupt handler */
+      intr_yield_on_return();
+    }
+    else {
+      /* default */
+      thread_yield();
+    }
   }
 }
 
@@ -826,16 +843,18 @@ struct thread * get_child_process (tid_t child_tid)
 
   struct list_elem *e;
 
-  ASSERT (intr_get_level () == INTR_OFF);
+  enum intr_level old_level = intr_disable ();
 
   for (e = list_begin (&thread_current()->child_list); e != list_end (&thread_current()->child_list);
        e = list_next (e))
     {
       struct thread *t = list_entry (e, struct thread, child_list_elem);
       if (t->tid == child_tid){
+        intr_set_level(old_level);
         return t;
       }
     }
-  
+  intr_set_level(old_level);
   return NULL;
 }
+/* 2-3. System Call */
