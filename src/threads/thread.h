@@ -86,6 +86,15 @@ typedef int pid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+/* 2-2 Argument Passing - process_wait */
+struct wait_status {
+  tid_t tid;
+  int exit_code;
+  bool waited;
+  struct semaphore sema;
+  struct list_elem elem;
+};
+/* 2-2 Argument Passing - process_wait */
 struct thread
   {
     /* Owned by thread.c. */
@@ -127,6 +136,7 @@ struct thread
     bool waited;
     bool loaded;                    /* 2-2. Process Synchronization */
     int exit_status;               /* 2-2. Process Synchronization */
+    struct wait_status * wait_status; /* 2-2 Argument Passing - process_wait */
 #endif
 
     /* Owned by thread.c. */
