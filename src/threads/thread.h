@@ -123,6 +123,8 @@ struct thread
     struct list_elem child_list_elem;
     struct list child_list;
     struct semaphore sema_exec;    /* 2-2. Process Synchronization */
+    struct semaphore sema_wait;    /* 2-2. Process Synchronization */
+    bool waited;
     bool loaded;                    /* 2-2. Process Synchronization */
     int exit_status;               /* 2-2. Process Synchronization */
 #endif

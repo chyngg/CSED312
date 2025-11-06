@@ -140,8 +140,26 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
+    /* 2-2 Argument Passing */
+  struct thread *cur = thread_current();
+  struct thread *child = get_child_process(child_tid);
+  if (child) {
+    if (child->waited) {
+      return -1;
+    }
+    child->waited = true;
+
+    sema_down(&child->sema_wait);
+    
+    int status = child->exit_status;
+
+    list_remove(&child->child_list_elem);
+    return status;
+  }
+  /* 2-2. Argument Passing */
+
   return -1;
 }
 
@@ -182,6 +200,12 @@ process_exit (void)
     cur->fd_list = NULL;
   }
   /* 2-3. System Call */
+
+  /* 2-2. Argument Passing */
+  if (cur->parent != NULL) {
+    sema_up(&cur->sema_wait);
+  }
+  /* 2-2. Argument Passing */
 }
 
 /* Sets up the CPU for running user code in the current

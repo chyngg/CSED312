@@ -557,6 +557,8 @@ init_thread (struct thread *t, const char *name, int priority)
 
   /* 2-2. Process Synchronization */
   sema_init(&(t->sema_exec), 0);
+  sema_init(&(t->sema_exec), 0);
+  t->waited = false;
   t->loaded = false;
   /* 2-2. Process Synchronization */
 #endif
