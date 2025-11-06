@@ -189,6 +189,9 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  t->fd_list = palloc_get_page (PAL_ZERO);
+  t->parent = thread_current();
+  list_push_back(&thread_current()->child_list, &t->child_list_elem);
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -547,20 +550,9 @@ init_thread (struct thread *t, const char *name, int priority)
   /* 2-3. System Call */
   // t->pid = tid;
   t->exit_status = 0; // exit status
-  // t->parent = NULL;
-  t->fd_list = palloc_get_page (PAL_ZERO);
+  t->parent = NULL;
   t->fd_next = 2; // 0(stdin) and 1(stdout) are reserved for the console
   list_init (&t->child_list);
-
-  if (t != initial_thread) {
-    t->parent = thread_current();
-    if (t->parent != NULL) {
-      list_push_back(&t->parent->child_list, &t->child_list_elem);
-    }
-  } else {
-    t->parent = NULL;
-  }
-
   /* 2-3. System Call */
 
   /* 2-2. Process Synchronization */

@@ -54,20 +54,26 @@ process_execute (const char *file_name)
     palloc_free_page (fn_copy); 
 
   // 2-2 Argument Passing
-  struct list_elem *e;
-  struct thread *child_thread = get_child_process(tid);
-  if (child_thread != NULL) {
-    sema_down(&child_thread->sema_exec);                 /* 자식이 loaded 셋하면 up */
-    if (!child_thread->loaded)                           /* 로드 실패면 -1 반환 */
+  struct thread *child = get_child_process(tid);
+  if (child) {
+    sema_down(&child->sema_exec);      // 자식이 loaded 값을 설정할 때까지 대기
+    if (!child->loaded) {              // 로딩 실패면 에러로 처리
+      palloc_free_page (fn_copy2);
       return TID_ERROR;
+    }
   }
+
   /*
+  struct list_elem *e;
+  struct thread *child_thread;
   for (e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
     child_thread = list_entry(e, struct thread, child_list_elem);
     if (child_thread->exit_status == -1) 
       return process_wait(tid);
   }
   */
+  
+  palloc_free_page (fn_copy2);
   return tid;
 }
 
@@ -511,6 +517,7 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
+/* 2-2 Argument Passing */
 int fn_to_argv(char **argv, char *fn_copy) {
   int argc = 0;
   char *token;
@@ -531,35 +538,42 @@ void stack_argv(char **argv, int argc, void **esp) {
   // Push arguments onto the stack in reverse order
   for (i = argc - 1; i >= 0; i--) {
     length = strlen(argv[i]);
-    *esp -= length + 1;
+    *esp = (uint8_t *)(*esp) - (length + 1);
     strlcpy(*esp, argv[i], length + 1);
-    argv[i] = *esp;
+    argv[i] = (char *)(*esp);
   }
 
   // Word-align the stack pointer
   uintptr_t esp_val = (uintptr_t)(*esp);
-  esp_val &= 0xfffffffc; // Align to 4 bytes
-  *esp = (void *)esp_val;
+  // esp_val &= 0xfffffffc; // Align to 4 bytes
+  // *esp = (void *)esp_val;
+  size_t pad = esp_val % 4;
+  if (pad) {
+    *esp = (uint8_t *)(*esp) - pad;
+    memset(*esp, 0, pad);
+  }
 
   // Push null sentinel
-  *esp -= 4;
-  **(uint32_t **)(esp) = 0;
+  *esp = (uint8_t *)(*esp) - 4;
+  *(uint32_t *)(*esp) = 0;
 
   // Push addresses of arguments
   for (i = argc - 1; i >= 0; i--) {
-    *esp -= 4;
-    **(uint32_t **)(esp) = argv[i];
+    *esp = (uint8_t *)(*esp) - 4;
+    *(uint32_t *)(*esp) = (uint32_t)argv[i];
   }
 
   // Push argv (address of first argument)
-  *esp -= 4;
-  **(uint32_t **)(esp) = *esp + 4;
+  uint32_t argv0_addr = (uint32_t)(*esp);
+  *esp = (uint8_t *)(*esp) - 4;
+  *(uint32_t *)(*esp) = argv0_addr;
 
   // Push argc
-  *esp -= 4;
-  **(uint32_t **)(esp) = argc;
+  *esp = (uint8_t *)(*esp) - 4;
+  *(uint32_t *)(*esp) = argc;
 
   // Push fake return address
-  *esp -= 4;
-  **(uint32_t **)(esp) = 0;
+  *esp = (uint8_t *)(*esp) - 4;
+  *(uint32_t *)(*esp) = 0;
 }
+/* 2-2 Argument Passing */
