@@ -23,7 +23,9 @@ int sys_write (int fd, const void *buffer, unsigned length);
 void sys_seek (int fd, unsigned position);
 unsigned sys_tell (int fd);
 void sys_close (int fd);
+bool is_mapped_user_vaddr (const void *vaddr, size_t size);
 void extract_arguments (struct intr_frame *f, int *syscall_argu, int argu_num);
+struct file * access_file (int fd);
 
 void
 syscall_init (void) 
@@ -37,8 +39,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   // printf ("system call!\n");
   // thread_exit ();
-  if(!is_user_vaddr(f->esp)){
-    thread_exit (); // ?
+  if(!is_mapped_user_vaddr(f->esp, sizeof(int))){
+    sys_exit (-1);
   }
 
   int syscall_num = *(int *)(f->esp);
@@ -123,6 +125,30 @@ syscall_handler (struct intr_frame *f UNUSED)
       sys_close (syscall_argu[0]);
 			break;
 	}
+}
+
+bool is_mapped_user_vaddr (const void *vaddr, size_t size){
+  if(vaddr == NULL){
+    return false;
+  }
+
+  const uint8_t *temp = (const uint8_t *)vaddr;
+  const uint8_t *end = temp + size;
+
+  while (temp < end) {
+    if (!is_user_vaddr(temp)){
+      return false;
+    }
+
+    void *kpage = pagedir_get_page(thread_current()->pagedir, temp);
+
+    if (kpage == NULL){
+      return false;
+    }
+
+    temp = (const uint8_t *)pg_round_down((void *)temp) + PGSIZE; // 다음 페이지로
+  }
+
 }
 
 void extract_arguments (struct intr_frame *f, int *syscall_argu, int argu_num){
