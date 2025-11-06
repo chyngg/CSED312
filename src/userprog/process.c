@@ -55,12 +55,19 @@ process_execute (const char *file_name)
 
   // 2-2 Argument Passing
   struct list_elem *e;
-  struct thread *child_thread;
+  struct thread *child_thread = get_child_process(tid);
+  if (child_thread != NULL) {
+    sema_down(&child_thread->sema_exec);                 /* 자식이 loaded 셋하면 up */
+    if (!child_thread->loaded)                           /* 로드 실패면 -1 반환 */
+      return TID_ERROR;
+  }
+  /*
   for (e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
-    child_thread = list_entry(e, struct thread, child_elem);
+    child_thread = list_entry(e, struct thread, child_list_elem);
     if (child_thread->exit_status == -1) 
       return process_wait(tid);
   }
+  */
   return tid;
 }
 
@@ -504,7 +511,7 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
-void fn_to_argv(char **argv, char *fn_copy) {
+int fn_to_argv(char **argv, char *fn_copy) {
   int argc = 0;
   char *token;
   char *save_ptr;
