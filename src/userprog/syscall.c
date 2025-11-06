@@ -204,6 +204,7 @@ pid_t sys_exec (const char *file){
   if(!is_valid_str(file)){
     sys_exit (-1);
   }
+
   pid_t pid = process_execute(file);
   struct thread * child = get_child_process(pid);
   
@@ -222,6 +223,10 @@ bool sys_create (const char *file, unsigned initial_size){
   if(!is_valid_str(file)){
     sys_exit (-1);
   }
+  if(*file == '\0'){
+    return false;
+  }
+
   lock_acquire(&file_system_lock);
   bool success = filesys_create (file, initial_size);
   lock_release(&file_system_lock);
@@ -232,6 +237,7 @@ bool sys_remove (const char *file){
   if(!is_valid_str(file)){
     sys_exit (-1);
   }
+
   lock_acquire(&file_system_lock);
   bool success = filesys_remove (file);
   lock_release(&file_system_lock);
@@ -242,8 +248,12 @@ int sys_open (const char *file){
   if(!is_valid_str(file)){
     sys_exit (-1);
   }
+  if(*file == '\0'){
+    return -1;
+  }
+
   lock_acquire(&file_system_lock);
-  struct file * f = filesys_open(file);
+  struct file * f = filesys_open (file);
   if(!f){
     lock_release(&file_system_lock);
     return -1;
@@ -262,21 +272,22 @@ int sys_filesize (int fd){
     lock_release(&file_system_lock);
     return -1;
   }
+  int filesize = file_length(f);
   lock_release(&file_system_lock);
-  return file_length(f);
+  return filesize;
 }
 
 int sys_read (int fd, void *buffer, unsigned length){
+  if((length != 0) && (!is_mapped_user_vaddr(buffer, length))){
+    sys_exit (-1);
+  }
+
   int length_read = 0;
   lock_acquire(&file_system_lock);
   if(fd == 0){ // stdin 
     for (int i = 0; i < length;i++){
       ((char*)buffer)[i]=input_getc();
-      if(((char*)buffer)[i] == '\0')
-      {
-        break;
-      }
-      length_read = i;
+      length_read ++;
     }
   }
   else if(fd == 1){
@@ -296,6 +307,10 @@ int sys_read (int fd, void *buffer, unsigned length){
 }
 
 int sys_write (int fd, const void *buffer, unsigned length){
+  if((length != 0) && (!is_mapped_user_vaddr(buffer, length))){
+    sys_exit (-1);
+  }
+  
   int length_write = 0;
   lock_acquire(&file_system_lock);
   if(fd == 0){ // stdin 
@@ -349,7 +364,7 @@ void sys_close (int fd){
     lock_release(&file_system_lock);
     return;
   }
-  file_close(fd);
+  file_close (f);
   thread_current()->fd_list[fd] = NULL;
   lock_release(&file_system_lock);
 }
