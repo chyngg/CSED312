@@ -136,7 +136,9 @@ struct thread
     bool waited;
     bool loaded;                    /* 2-2. Process Synchronization */
     int exit_status;               /* 2-2. Process Synchronization */
+    struct list wait_list; /* 2-2 Argument Passing - process_wait */
     struct wait_status * wait_status; /* 2-2 Argument Passing - process_wait */
+    struct file * executing_file; /* 2-3. System Call - ROX */
 #endif
 
     /* Owned by thread.c. */

@@ -553,14 +553,18 @@ init_thread (struct thread *t, const char *name, int priority)
   t->parent = NULL;
   t->fd_next = 2; // 0(stdin) and 1(stdout) are reserved for the console
   list_init (&t->child_list);
+  list_init (&t->wait_list); /* 2-2 Argument Passing - process_wait */
   /* 2-3. System Call */
 
   /* 2-2. Process Synchronization */
   sema_init(&(t->sema_exec), 0);
-  sema_init(&(t->sema_exec), 0);
   t->waited = false;
   t->loaded = false;
   /* 2-2. Process Synchronization */
+
+  /* 2-3. System Call - ROX */
+  t->executing_file = NULL;
+  /* 2-3. System Call - ROX */
 #endif
 }
 

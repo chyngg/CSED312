@@ -56,7 +56,7 @@ process_execute (const char *file_name)
   ws->exit_code = -1;
   ws->waited = false;
   sema_init(&ws->sema, 0);
-  list_push_back(&thread_current()->child_list, &ws->elem);
+  list_push_back(&thread_current()->wait_list, &ws->elem);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (filename, PRI_DEFAULT, start_process, fn_copy);
@@ -163,7 +163,7 @@ process_wait (tid_t child_tid)
   struct wait_status *ws = NULL;
 
   struct list_elem *e;
-  for (e = list_begin(&cur->child_list); e != list_end(&cur->child_list); e = list_next(e)) {
+  for (e = list_begin(&cur->wait_list); e != list_end(&cur->wait_list); e = list_next(e)) {
     struct wait_status *x = list_entry(e, struct wait_status, elem);
     if (x->tid == child_tid) { ws = x; break; }
   }
@@ -226,6 +226,14 @@ process_exit (void)
     sema_up(&cur->wait_status->sema);
   }
   /* 2-2 Argument Passing - process_wait */
+
+  /* 2-3. System Call - ROX */
+  if (cur->executing_file) {
+    file_allow_write(cur->executing_file);
+    file_close(cur->executing_file);
+    cur->executing_file = NULL;
+  }
+  /* 2-3. System Call - ROX */
 }
 
 /* Sets up the CPU for running user code in the current
@@ -340,6 +348,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+  t->executing_file = file; /* 2-3. System Call - ROX */
+  file_deny_write(file); /* 2-3. System Call - ROX */
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -424,7 +434,17 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  /* 2-3. System Call - ROX */
+  if (!success) {
+    if (t->executing_file) {
+      file_allow_write (t->executing_file);
+      file_close (t->executing_file);
+      t->executing_file = NULL;
+    } else if (file) {
+      file_close (file);
+    }
+  }
+  /* 2-3. System Call - ROX */
   return success;
 }
 
