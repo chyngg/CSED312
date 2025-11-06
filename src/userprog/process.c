@@ -52,12 +52,12 @@ process_execute (const char *file_name)
   tid = thread_create (filename, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
-
+  
   // 2-2 Argument Passing
   struct thread *child = get_child_process(tid);
   if (child) {
-    sema_down(&child->sema_exec);      // 자식이 loaded 값을 설정할 때까지 대기
-    if (!child->loaded) {              // 로딩 실패면 에러로 처리
+    sema_down(&child->sema_exec);
+    if (!child->loaded) {
       palloc_free_page (fn_copy2);
       return TID_ERROR;
     }

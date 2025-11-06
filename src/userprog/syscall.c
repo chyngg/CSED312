@@ -367,7 +367,7 @@ void sys_close (int fd){
     return;
   }
   file_close (f);
-  thread_current()->fd_list[fd] = NULL;
   lock_release(&file_system_lock);
+  thread_current()->fd_list[fd] = NULL;
 }
 /* 2-3. System Call */
