@@ -242,11 +242,6 @@ pid_t sys_exec (const char *file){
     return -1;
   }
 
-  struct thread * child = get_child_process(pid);
-  
-  if (!child || !child->loaded) {
-    return -1;
-  }
   return pid;
 }
 

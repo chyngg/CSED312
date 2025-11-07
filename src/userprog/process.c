@@ -65,6 +65,8 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR){
     palloc_free_page (fn_copy); 
     list_remove(&ws->elem); palloc_free_page(ws);
+    palloc_free_page(fn_copy2);
+    return TID_ERROR;
   }
   ws->tid = tid;
   struct thread *child = get_child_process(tid);
@@ -229,13 +231,23 @@ process_exit (void)
   if (cur->parent != NULL) {
       list_remove(&cur->child_list_elem);
   }
+
+  // should clean wait_list 
+  struct list_elem *e;
+  struct list_elem *next;
+  for (e = list_begin(&cur->wait_list); e != list_end(&cur->wait_list); e = next) {
+    next = list_next(e);
+    struct wait_status *ws = list_entry(e, struct wait_status, elem);
+    list_remove(e);
+    palloc_free_page(ws);
+  }
   /* 2-3. System Call */
 
   /* 2-2 Argument Passing - process_wait */
-  //if (cur->wait_status) {
+  if (cur->wait_status) {
     cur->wait_status->exit_code = cur->exit_status;
     sema_up(&cur->wait_status->sema);
-  //}
+  }
   /* 2-2 Argument Passing - process_wait */
 
   /* 2-3. System Call - ROX */
