@@ -3,7 +3,7 @@
 
 typedef int pid_t;
 
-static struct lock file_system_lock;
+extern struct lock file_system_lock;
 
 void syscall_init (void);
 

@@ -217,7 +217,9 @@ process_exit (void)
   if(cur->fd_list){
     for(int fd = 2; fd < cur->fd_next; fd++){
       if(cur->fd_list[fd]){
+        lock_acquire(&file_system_lock);
         file_close(cur->fd_list[fd]);
+        lock_release(&file_system_lock);
         cur->fd_list[fd] = NULL;
       }
     }
@@ -235,9 +237,11 @@ process_exit (void)
 
   /* 2-3. System Call - ROX */
   if (cur->executing_file) {
+    lock_acquire(&file_system_lock);
     file_allow_write(cur->executing_file);
     file_close(cur->executing_file);
     cur->executing_file = NULL;
+    lock_release(&file_system_lock);
   }
   /* 2-3. System Call - ROX */
 }
@@ -348,17 +352,21 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  lock_acquire(&file_system_lock);
   file = filesys_open (file_name);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
+      lock_release(&file_system_lock);
       goto done; 
     }
   t->executing_file = file; /* 2-3. System Call - ROX */
   file_deny_write(file); /* 2-3. System Call - ROX */
 
   /* Read and verify executable header. */
-  if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
+  int bytes_read = file_read (file, &ehdr, sizeof ehdr);
+  lock_release(&file_system_lock);
+  if (bytes_read != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
       || ehdr.e_type != 2
       || ehdr.e_machine != 3
@@ -376,12 +384,19 @@ load (const char *file_name, void (**eip) (void), void **esp)
     {
       struct Elf32_Phdr phdr;
 
-      if (file_ofs < 0 || file_ofs > file_length (file))
+      lock_acquire(&file_system_lock);
+      if (file_ofs < 0 || file_ofs > file_length (file)){
+        lock_release(&file_system_lock);
         goto done;
+      }
       file_seek (file, file_ofs);
 
-      if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
+      if (file_read (file, &phdr, sizeof phdr) != sizeof phdr){
+        lock_release(&file_system_lock);
         goto done;
+      }
+      lock_release(&file_system_lock);
+      
       file_ofs += sizeof phdr;
       switch (phdr.p_type) 
         {
@@ -442,6 +457,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* We arrive here whether the load is successful or not. */
   /* 2-3. System Call - ROX */
   if (!success) {
+    lock_acquire(&file_system_lock);
     if (t->executing_file) {
       file_allow_write (t->executing_file);
       file_close (t->executing_file);
@@ -449,8 +465,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     } else if (file) {
       file_close (file);
     }
+    lock_release(&file_system_lock);
   }
   /* 2-3. System Call - ROX */
+  
   return success;
 }
 
@@ -468,7 +486,10 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
     return false; 
 
   /* p_offset must point within FILE. */
-  if (phdr->p_offset > (Elf32_Off) file_length (file)) 
+  lock_acquire(&file_system_lock);
+  Elf32_Off file_length_ = (Elf32_Off) file_length (file);
+  lock_release(&file_system_lock);
+  if (phdr->p_offset > file_length_) 
     return false;
 
   /* p_memsz must be at least as big as p_filesz. */
@@ -525,7 +546,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  lock_acquire(&file_system_lock);
   file_seek (file, ofs);
+  lock_release(&file_system_lock);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -540,7 +563,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         return false;
 
       /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+      lock_acquire(&file_system_lock);
+      int bytes_read = file_read (file, kpage, page_read_bytes);
+      lock_release(&file_system_lock);
+      if (bytes_read != (int) page_read_bytes)
         {
           palloc_free_page (kpage);
           return false; 
