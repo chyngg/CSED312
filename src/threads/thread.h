@@ -92,6 +92,8 @@ struct wait_status {
   int exit_code;
   bool waited;
   struct semaphore sema;
+  struct semaphore load_sema; // load 성공 확인용
+  bool load_success; // load 성공 확인용
   struct list_elem elem;
 };
 /* 2-2 Argument Passing - process_wait */

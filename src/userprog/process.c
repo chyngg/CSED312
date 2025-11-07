@@ -58,6 +58,8 @@ process_execute (const char *file_name)
   ws->exit_code = -1;
   ws->waited = false;
   sema_init(&ws->sema, 0);
+  sema_init(&ws->load_sema, 0); // load 성공 확인용
+  ws->load_success = false; // load 성공 확인용
   list_push_back(&thread_current()->wait_list, &ws->elem);
 
   /* Create a new thread to execute FILE_NAME. */
@@ -68,7 +70,7 @@ process_execute (const char *file_name)
     palloc_free_page(fn_copy2);
     return TID_ERROR;
   }
-  ws->tid = tid;
+  // ws->tid = tid;
   struct thread *child = get_child_process(tid);
   if (!child) {
     list_remove(&ws->elem); palloc_free_page(ws);
@@ -80,12 +82,22 @@ process_execute (const char *file_name)
   /* 2-2 Argument Passing - process_wait */
 
   /* 2-2. Argument Passing */
+  sema_down(&ws->load_sema);
+  if (!ws->load_success) {
+    list_remove(&ws->elem);
+    palloc_free_page(ws);
+    palloc_free_page(fn_copy2);
+    return TID_ERROR;
+  }
+
+  /*
   sema_down(&child->sema_exec);
   if (!child->loaded) {
     list_remove(&ws->elem); palloc_free_page(ws);
     palloc_free_page(fn_copy2);
     return TID_ERROR;
   }
+  */
 
   /*
   struct list_elem *e;
@@ -97,6 +109,7 @@ process_execute (const char *file_name)
   }
   */
   
+  ws->tid = tid;
   palloc_free_page (fn_copy2);
   return tid;
   /* 2-2. Argument Passing */
@@ -117,7 +130,6 @@ start_process (void *file_name_)
   int argc;
   char **argv;
 
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -128,9 +140,19 @@ start_process (void *file_name_)
   argv = palloc_get_page(0);
   argc = fn_to_argv(argv, fn_copy);
 
+  struct wait_status *ws = thread_current()->wait_status;
+  
   success = load (argv[0], &if_.eip, &if_.esp);
 
   thread_current()->loaded = success;
+
+  // load 성공 확인용
+  if (ws != NULL) {
+    ws->load_success = success;
+    sema_up(&ws->load_sema);
+  }
+  // load 성공 확인용
+
   if (success) 
     stack_argv(argv, argc, &if_.esp);
   sema_up(&thread_current()->sema_exec);
