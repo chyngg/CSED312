@@ -7,8 +7,6 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 
-static struct lock file_system_lock;
-
 static void syscall_handler (struct intr_frame *);
 void sys_halt (void);
 void sys_exit (int status);

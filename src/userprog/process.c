@@ -18,6 +18,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#include "userprog/syscall.h"
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -66,17 +68,21 @@ process_execute (const char *file_name)
   }
   ws->tid = tid;
   struct thread *child = get_child_process(tid);
+  if (!child) {
+    list_remove(&ws->elem);
+    palloc_free_page(ws);
+    palloc_free_page(fn_copy2);
+    return TID_ERROR;
+  }
+
   child->wait_status = ws;
   /* 2-2 Argument Passing - process_wait */
 
   /* 2-2. Argument Passing */
-  //struct thread *child = get_child_process(tid);
-  if (child) {
-    sema_down(&child->sema_exec);
-    if (!child->loaded) {
-      palloc_free_page (fn_copy2);
-      return TID_ERROR;
-    }
+  sema_down(&child->sema_exec);
+  if (!child->loaded) {
+    palloc_free_page (fn_copy2);
+    return TID_ERROR;
   }
 
   /*
