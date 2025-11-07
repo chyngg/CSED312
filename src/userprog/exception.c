@@ -5,6 +5,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+#include "threads/vaddr.h"
+
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -89,7 +91,8 @@ kill (struct intr_frame *f)
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
-      thread_exit (); 
+      // thread_exit (); 
+      sys_exit(-1);
 
     case SEL_KCSEG:
       /* Kernel's code segment, which indicates a kernel bug.
@@ -97,6 +100,7 @@ kill (struct intr_frame *f)
          may cause kernel exceptions--but they shouldn't arrive
          here.)  Panic the kernel to make the point.  */
       intr_dump_frame (f);
+      sys_exit(-1);
       PANIC ("Kernel bug - unexpected interrupt in kernel"); 
 
     default:
@@ -104,7 +108,8 @@ kill (struct intr_frame *f)
          kernel. */
       printf ("Interrupt %#04x (%s) in unknown segment %04x\n",
              f->vec_no, intr_name (f->vec_no), f->cs);
-      thread_exit ();
+      // thread_exit ();
+      sys_exit(-1);
     }
 }
 
@@ -158,7 +163,12 @@ page_fault (struct intr_frame *f)
           user ? "user" : "kernel");
    
    /* 2. Project 2 */
-   // at useer moode, all exceptions(including page fault) shoould call exit(-1)
+   if (!user && is_user_vaddr(fault_addr)) {
+    sys_exit(-1);
+    return;
+  }
+
+   // at user moode, all exceptions(including page fault) shoould call exit(-1)
    if (user) {
       sys_exit(-1);
    } else {

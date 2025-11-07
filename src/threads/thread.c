@@ -549,7 +549,7 @@ init_thread (struct thread *t, const char *name, int priority)
 #ifdef USERPROG
   /* 2-3. System Call */
   // t->pid = tid;
-  t->exit_status = 0; // exit status
+  t->exit_status = -1; // exit status
   t->parent = NULL;
   t->fd_next = 2; // 0(stdin) and 1(stdout) are reserved for the console
   list_init (&t->child_list);

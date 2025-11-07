@@ -69,8 +69,7 @@ process_execute (const char *file_name)
   ws->tid = tid;
   struct thread *child = get_child_process(tid);
   if (!child) {
-    list_remove(&ws->elem);
-    palloc_free_page(ws);
+    list_remove(&ws->elem); palloc_free_page(ws);
     palloc_free_page(fn_copy2);
     return TID_ERROR;
   }
@@ -81,7 +80,8 @@ process_execute (const char *file_name)
   /* 2-2. Argument Passing */
   sema_down(&child->sema_exec);
   if (!child->loaded) {
-    palloc_free_page (fn_copy2);
+    list_remove(&ws->elem); palloc_free_page(ws);
+    palloc_free_page(fn_copy2);
     return TID_ERROR;
   }
 
@@ -184,8 +184,6 @@ process_wait (tid_t child_tid)
   palloc_free_page(ws);
   return status;
   /* 2-2 Argument Passing - process_wait */
-
-  return -1;
 }
 
 /* Free the current process's resources. */
@@ -226,13 +224,18 @@ process_exit (void)
     palloc_free_page(cur->fd_list);
     cur->fd_list = NULL;
   }
+
+  // should remove from child_list
+  if (cur->parent != NULL) {
+      list_remove(&cur->child_list_elem);
+  }
   /* 2-3. System Call */
 
   /* 2-2 Argument Passing - process_wait */
-  if (cur->wait_status) {
+  //if (cur->wait_status) {
     cur->wait_status->exit_code = cur->exit_status;
     sema_up(&cur->wait_status->sema);
-  }
+  //}
   /* 2-2 Argument Passing - process_wait */
 
   /* 2-3. System Call - ROX */

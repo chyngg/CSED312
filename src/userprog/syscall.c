@@ -190,6 +190,36 @@ struct file * access_file (int fd){
   }
 }
 
+static void copy_in (void *dst_, const void *usrc_, size_t size) {
+  uint8_t *dst = dst_;
+  const uint8_t *usrc = usrc_;
+  for (size_t i = 0; i < size; i++) {
+    if (!is_user_vaddr(usrc) ||
+        pagedir_get_page(thread_current()->pagedir, (void *)usrc) == NULL)
+      sys_exit(-1);
+    dst[i] = *usrc++;
+  }
+}
+
+static char *copy_in_string (const char *ustr) {
+  if (ustr == NULL) sys_exit(-1);
+  char *kbuf = palloc_get_page (0);
+  if (!kbuf) sys_exit(-1);
+  size_t i = 0;
+  while (i < PGSIZE - 1) {
+    if (!is_user_vaddr(ustr + i) ||
+        pagedir_get_page(thread_current()->pagedir, (void *)(ustr + i)) == NULL) {
+      palloc_free_page(kbuf);
+      sys_exit(-1);
+    }
+    char c = *(ustr + i);
+    kbuf[i++] = c;
+    if (c == '\0') break;
+  }
+  if (i == PGSIZE - 1) { palloc_free_page(kbuf); sys_exit(-1); }
+  return kbuf; // palloc 페이지(커널 메모리)
+}
+
 void sys_halt (void){
   shutdown_power_off();
 }
@@ -205,7 +235,13 @@ pid_t sys_exec (const char *file){
     sys_exit (-1);
   }
 
-  pid_t pid = process_execute(file);
+  char *kfile = copy_in_string(file);
+  pid_t pid = process_execute(kfile);
+  palloc_free_page(kfile);
+  if (pid == TID_ERROR){
+    return -1;
+  }
+
   struct thread * child = get_child_process(pid);
   
   if (!child || !child->loaded) {
