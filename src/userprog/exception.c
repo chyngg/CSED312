@@ -153,27 +153,57 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
+  struct thread *t = thread_current();
+  if (!not_present) {
+   // write to read-only page
+   if (user) 
+      sys_exit(-1);
    
-   /* 2. Project 2 */
-   if (!user && is_user_vaddr(fault_addr)) {
-    sys_exit(-1);
-    return;
+   else 
+      kill (f);
+      
+   return;
   }
 
-   // at user moode, all exceptions(including page fault) shoould call exit(-1)
-   if (user) {
+  if (!is_user_vaddr(fault_addr) || fault_addr == NULL) {
+   if (user) 
       sys_exit(-1);
-   } else {
+   
+   else 
+      kill (f);
+      
+   return;
+  }
+
+  struct vm_entry *vme = spt_find (&t->spt, fault_addr);
+  if (vme != NULL)
+  {
+   if (!handle_fault (vme)) {
+      if (user) 
+         sys_exit(-1);
+      
+      else 
+         kill (f);
+         
+      return;
+   }
+  }
+
+   if (user)
+   {
+   void *esp = f->esp;
+   if (check_stack_boundary (fault_addr, esp)) {
+      void *upage = pg_round_down (fault_addr);
+      if (!expand_stack (upage)) 
+         sys_exit(-1);
+      return;
+   }
+   sys_exit(-1);
+   }
+
+   else {
       kill (f);
    }
-   /* 2. Project 2 */
+
 }
 

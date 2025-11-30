@@ -566,6 +566,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->executing_file = NULL;
   /* 2-3. System Call - ROX */
 #endif
+  spt_init(&t->spt); /* VM */
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

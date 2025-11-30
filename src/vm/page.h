@@ -3,9 +3,9 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include <hash.h>
 #include <stdint.h>
 #include "filesys/file.h"
+#include "lib/kernel/hash.h"
 
 // page 종류
 enum vm_type {
@@ -43,5 +43,8 @@ void spt_destroy (struct s_page_table *spt);
 bool spt_insert (struct s_page_table *spt, struct vm_entry *vme);
 struct vm_entry *spt_find (struct s_page_table *spt, void *vaddr);
 void spt_remove (struct s_page_table *spt, struct vm_entry *vme);
+
+bool check_stack_boundary (void *fault_addr, void *esp);
+bool expand_stack (void *upage);
 
 #endif /* vm/page.h */

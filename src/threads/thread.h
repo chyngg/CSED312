@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include "vm/page.h"
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -142,6 +143,8 @@ struct thread
     struct wait_status * wait_status; /* 2-2 Argument Passing - process_wait */
     struct file * executing_file; /* 2-3. System Call - ROX */
 #endif
+
+   struct s_page_table spt;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
