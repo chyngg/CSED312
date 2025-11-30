@@ -579,70 +579,84 @@ static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
               uint32_t read_bytes, uint32_t zero_bytes, bool writable) 
 {
+  /* 기존과 같은 sanity check */
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  lock_acquire(&file_system_lock);
-  file_seek (file, ofs);
-  lock_release(&file_system_lock);
+  struct thread *t = thread_current ();
+
+  /* 더 이상 여기서는 file_read / palloc_get_page / install_page 를 하지 않음
+     대신 페이지마다 vm_entry 를 만들어 SPT에 넣어두기만 함 */
   while (read_bytes > 0 || zero_bytes > 0) 
     {
-      /* Calculate how to fill this page.
-         We will read PAGE_READ_BYTES bytes from FILE
-         and zero the final PAGE_ZERO_BYTES bytes. */
+      /* 이번 페이지에서 실제로 파일에서 읽을 양 / zero-fill 양 계산 */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
+      /* vm_entry 하나 할당 */
+      struct vm_entry *vme = malloc (sizeof *vme);
+      if (vme == NULL)
         return false;
 
-      /* Load this page. */
-      lock_acquire(&file_system_lock);
-      int bytes_read = file_read (file, kpage, page_read_bytes);
-      lock_release(&file_system_lock);
-      if (bytes_read != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+      vme->type       = VM_BIN;        /* 실행 파일 세그먼트 */
+      vme->vaddr      = upage;         /* user 가 보게 될 가상주소 (page-aligned) */
+      vme->writable   = writable;
 
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
+      vme->file       = file;          /* 필요하면 file_reopen(file) 써도 됨 */
+      vme->offset     = ofs;
+      vme->read_bytes = page_read_bytes;
+      vme->zero_bytes = page_zero_bytes;
+
+      vme->swap_slot  = (size_t) -1;   /* 아직 swap에 안 나감 */
+      vme->is_loaded  = false;         /* lazy loading이므로 아직 메모리에 없음 */
+
+      /* SPT에 등록 (중복 / 실패시 메모리 정리 후 false) */
+      if (!spt_insert (&t->spt, vme))
         {
-          palloc_free_page (kpage);
-          return false; 
+          free (vme);
+          return false;
         }
 
-      /* Advance. */
+      /* 다음 페이지로 이동 */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
-      upage += PGSIZE;
+      upage      += PGSIZE;
+      ofs        += page_read_bytes;
     }
   return true;
 }
+
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
 setup_stack (void **esp) 
 {
-  uint8_t *kpage;
-  bool success = false;
+  struct thread *t = thread_current ();
+  uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL) 
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      else
-        palloc_free_page (kpage);
-    }
-  return success;
+  struct vm_entry *vme = malloc (sizeof *vme);
+  if (vme == NULL)
+    return false;
+
+  vme->type       = VM_ANON;       /* 익명 페이지 */
+  vme->vaddr      = upage;         /* user 가 보게 될 가상주소 (page-aligned) */
+  vme->writable   = true;
+  vme->file       = NULL;          /* 익명 페이지이므로 파일 없음 */
+  vme->offset     = 0;
+  vme->read_bytes = 0;
+  vme->zero_bytes = PGSIZE;
+  vme->swap_slot  = (size_t) -1;   /* 아직 swap에 안 나감 */
+  vme->is_loaded  = false;         /* lazy loading이므로 아직 메모리에 없음 */
+
+  if (!spt_insert (&t->spt, vme))
+  {
+    free (vme);
+    return false;
+  } 
+  *esp = PHYS_BASE;
+  return true;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
