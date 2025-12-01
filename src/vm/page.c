@@ -142,7 +142,7 @@ bool check_stack_boundary (void *fault_addr, void *esp) {
     if (fault_addr < stack_limit)
         return false;
 
-    if (fault_addr < (uint7_t *)esp - 32)
+    if (fault_addr < (uint8_t *)esp - 32)
         return false;
 
     return true;

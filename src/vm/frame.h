@@ -7,6 +7,7 @@
 #include "vm/page.h"
 #include "userprog/pagedir.h"
 #include "threads/vaddr.h"
+#include "threads/palloc.h"
 
 struct thread;
 struct vm_entry;
