@@ -567,6 +567,11 @@ init_thread (struct thread *t, const char *name, int priority)
   /* 2-3. System Call - ROX */
 #endif
   spt_init(&t->spt); /* VM */
+
+  /* 3 Virtual Memory - File memory mapping */
+  list_init (&t->mmap_table);
+  t->next_mapid = 1;
+  /* 3 Virtual Memory - File memory mapping */
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

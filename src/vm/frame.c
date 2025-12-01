@@ -7,6 +7,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "vm/page.h"
+#include "vm/swap.h"
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
 
@@ -69,7 +70,7 @@ void *frame_alloc (enum palloc_flags flags, struct vm_entry *vme) {
     f->pinned = true;
 
     lock_release(&frame_table_lock);
-    return kpage
+    return kpage;
 }
 
 // 프레임 해제
@@ -97,6 +98,33 @@ void frame_free (void *page_addr) {
 
     lock_release(&frame_table_lock);
 
+}
+
+void frame_free_thread (struct thread *t) {
+    if (t == NULL)
+        return;
+
+    lock_acquire(&frame_table_lock);
+
+    struct list_elem *e = list_begin(&frame_table);
+    while (e != list_end(&frame_table)) {
+        struct frame *f = list_entry(e, struct frame, ft_elem);
+        e = list_next(e);
+
+        if (f->thread == t) {
+            if (clock_hand == &f->ft_elem) {
+                clock_hand = e;
+                if (clock_hand == list_end(&frame_table))
+                    clock_hand = list_empty(&frame_table) ? NULL : list_begin(&frame_table);
+            }
+
+            list_remove(&f->ft_elem);
+            palloc_free_page(f->page_addr);
+            free(f);
+        }
+    }
+
+    lock_release(&frame_table_lock);
 }
 
 // Eviction 알고리즘 (clock)으로 victim frame 선택

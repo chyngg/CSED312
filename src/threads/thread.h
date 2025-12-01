@@ -23,6 +23,10 @@ typedef int tid_t;
 /* 2-3. System Call */
 typedef int pid_t;
 
+/* 3 Virtual Memory - File memory mapping */
+typedef int mapid_t;
+#define MAP_FAILED ((mapid_t) -1)
+
 /* Thread priorities. */
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
@@ -87,6 +91,17 @@ typedef int pid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+/* 3 Virtual Memory - File memory mapping */
+struct mmap_entry {
+    mapid_t id;
+    struct file *file;           /* Reopened file object. */
+    void *base;                  /* Start user addr (page-aligned). */
+    size_t length;               /* File length in bytes. */
+    size_t page_cnt;             /* Number of pages in mapping. */
+
+    struct list_elem elem;       /* In thread->mmap_list. */
+};
+/* 3 Virtual Memory - File memory mapping */
 /* 2-2 Argument Passing - process_wait */
 struct wait_status {
   tid_t tid;
@@ -146,8 +161,13 @@ struct thread
 
    struct s_page_table spt;
 
-    /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
+   /* Owned by thread.c. */
+   unsigned magic;                     /* Detects stack overflow. */
+
+   /* 3 Virtual Memory - File memory mapping */
+   struct list mmap_table;       /* List of struct mmap_entry. */
+   mapid_t next_mapid;          /* Next mapping id. */
+   /* 3 Virtual Memory - File memory mapping */
   };
 
 /* If false (default), use round-robin scheduler.

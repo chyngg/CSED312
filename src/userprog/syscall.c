@@ -1,11 +1,16 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <round.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 /* 2-3. System Call */
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+#include "filesys/file.h"
+#include "vm/frame.h"
+#include "userprog/pagedir.h"
 
 struct lock file_system_lock;
 
@@ -23,6 +28,8 @@ int sys_write (int fd, const void *buffer, unsigned length);
 void sys_seek (int fd, unsigned position);
 unsigned sys_tell (int fd);
 void sys_close (int fd);
+mapid_t sys_mmap (int fd, void *addr);
+void sys_munmap (mapid_t mapid);
 bool is_mapped_user_vaddr (const void *vaddr, size_t size);
 void extract_arguments (struct intr_frame *f, int *syscall_argu, int argu_num);
 struct file * access_file (int fd);
@@ -122,6 +129,18 @@ syscall_handler (struct intr_frame *f UNUSED)
 		case SYS_CLOSE:
       extract_arguments(f, syscall_argu, 1);
       sys_close (syscall_argu[0]);
+			break;
+
+    // mapid_t sys_mmap (int fd, void *addr)
+    case SYS_MMAP:
+			extract_arguments(f, syscall_argu, 2);
+      f->eax = sys_mmap (syscall_argu[0], (void *) syscall_argu[1]);
+			break;
+
+    // void sys_munmap (mapid_t mapid)
+		case SYS_MUNMAP:
+			extract_arguments(f, syscall_argu, 1);
+			sys_munmap ((mapid_t) syscall_argu[0]);
 			break;
 	}
 }
@@ -402,3 +421,147 @@ void sys_close (int fd){
   thread_current()->fd_list[fd] = NULL;
 }
 /* 2-3. System Call */
+
+/* 3 Virtual Memory - File memory mapping */
+mapid_t sys_mmap (int fd, void *addr) {
+  struct thread *t = thread_current ();
+
+  if (fd == 0 || fd == 1 || addr == NULL || addr != pg_round_down (addr))
+    return MAP_FAILED;
+
+  lock_acquire (&file_system_lock);
+  struct file *orig = access_file (fd);
+  off_t length = orig ? file_length (orig) : 0;
+  struct file *file = orig ? file_reopen (orig) : NULL;
+  lock_release (&file_system_lock);
+
+  if (file == NULL || length <= 0)
+    {
+      if (file != NULL)
+        {
+          lock_acquire (&file_system_lock);
+          file_close (file);
+          lock_release (&file_system_lock);
+        }
+      return MAP_FAILED;
+    }
+
+  size_t page_cnt = DIV_ROUND_UP ((size_t) length, PGSIZE);
+  void *cur = addr;
+  for (size_t i = 0; i < page_cnt; i++, cur += PGSIZE)
+    {
+      if (spt_find (&t->spt, cur) != NULL
+          || !is_user_vaddr (cur)
+          || !is_user_vaddr ((uint8_t *) cur + PGSIZE - 1))
+        {
+          lock_acquire (&file_system_lock);
+          file_close (file);
+          lock_release (&file_system_lock);
+          return MAP_FAILED;
+        }
+    }
+
+  struct mmap_entry *m = malloc (sizeof *m);
+  if (m == NULL)
+    {
+      lock_acquire (&file_system_lock);
+      file_close (file);
+      lock_release (&file_system_lock);
+      return MAP_FAILED;
+    }
+
+  m->id = t->next_mapid++;
+  m->file = file;
+  m->base = addr;
+  m->length = length;
+  m->page_cnt = page_cnt;
+  list_push_back (&t->mmap_table, &m->elem);
+
+  cur = addr;
+  off_t ofs = 0;
+  size_t remain = length;
+  for (size_t i = 0; i < page_cnt; i++, cur += PGSIZE)
+    {
+      size_t page_read_bytes = remain < PGSIZE ? remain : PGSIZE;
+      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+      struct vm_entry *vme = malloc (sizeof *vme);
+      if (vme == NULL)
+        {
+          sys_munmap (m->id);
+          return MAP_FAILED;
+        }
+
+      vme->type = VM_FILE;
+      vme->vaddr = cur;
+      vme->writable = true;
+      vme->file = file;
+      vme->offset = ofs;
+      vme->read_bytes = page_read_bytes;
+      vme->zero_bytes = page_zero_bytes;
+      vme->swap_slot = (size_t) -1;
+      vme->is_loaded = false;
+
+      if (!spt_insert (&t->spt, vme))
+        {
+          free (vme);
+          sys_munmap (m->id);
+          return MAP_FAILED;
+        }
+
+      remain -= page_read_bytes;
+      ofs += page_read_bytes;
+    }
+
+  return m->id;
+}
+
+void sys_munmap (mapid_t id) {
+  struct thread *t = thread_current ();
+  struct mmap_entry *target = NULL;
+
+  struct list_elem *e;
+  for (e = list_begin (&t->mmap_table); e != list_end (&t->mmap_table);
+       e = list_next (e))
+    {
+      struct mmap_entry *m = list_entry (e, struct mmap_entry, elem);
+      if (m->id == id)
+        {
+          target = m;
+          break;
+        }
+    }
+
+  if (target == NULL)
+    return;
+
+  lock_acquire (&file_system_lock);
+  void *cur = target->base;
+  for (size_t i = 0; i < target->page_cnt; i++, cur += PGSIZE)
+    {
+      struct vm_entry *vme = spt_find (&t->spt, cur);
+      if (vme == NULL)
+        continue;
+
+      if (vme->is_loaded)
+        {
+          void *kaddr = pagedir_get_page (t->pagedir, vme->vaddr);
+          if (kaddr != NULL)
+            {
+              if (pagedir_is_dirty (t->pagedir, vme->vaddr))
+                file_write_at (target->file, kaddr, vme->read_bytes,
+                               vme->offset);
+              pagedir_clear_page (t->pagedir, vme->vaddr);
+              frame_free (kaddr);
+            }
+        }
+
+      spt_remove (&t->spt, vme);
+    }
+
+  file_close (target->file);
+  lock_release (&file_system_lock);
+  list_remove (&target->elem);
+  free (target);
+}
+/* 3 Virtual Memory - File memory mapping */

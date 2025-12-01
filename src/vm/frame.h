@@ -18,13 +18,14 @@ struct frame {
     bool pinned;
 
     struct list_elem ft_elem;
-}
+};
 
 void frame_table_init(void);
 
 void *frame_alloc(enum palloc_flags flags, struct vm_entry *vme);
 void frame_free(void *page_addr);
-void frame *frame_evict(void);
+void frame_free_thread(struct thread *t);
+struct frame *frame_evict(void);
 
 void frame_pin(void *page_addr);
 void frame_unpin(void *page_addr);

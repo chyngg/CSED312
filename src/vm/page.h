@@ -33,6 +33,8 @@ struct vm_entry {
 
 struct s_page_table {
     struct hash page_map; // vm_entry를 저장하는 해시 테이블
+	bool swapped; /* 3 Virtual Memory - Swap table */
+	size_t swap_index; /* 3 Virtual Memory - Swap table */
 };
 
 bool handle_fault (struct vm_entry *vme);

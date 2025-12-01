@@ -19,6 +19,9 @@
 #include "threads/vaddr.h"
 
 #include "userprog/syscall.h"
+#include "vm/frame.h"
+#include "vm/swap.h"
+#include "lib/kernel/hash.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -217,7 +220,31 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  spt_destroy(&cur->spt);
+  /* 3 Virtual Memory - On process termination */
+  // mmap table
+  struct list_elem *mmap_elem = list_begin (&cur->mmap_table);
+  while (mmap_elem != list_end (&cur->mmap_table)) {
+    struct mmap_entry *m = list_entry (mmap_elem, struct mmap_entry, elem);
+    mmap_elem = list_next (mmap_elem);
+    sys_munmap (m->id);
+  }
+
+  // s-page tables
+  spt_destroy (&cur->spt);
+
+  struct hash_iterator hi;
+  hash_first (&hi, &cur->spt.page_map);
+  while (hash_next (&hi))
+    {
+      struct vm_entry *vme = hash_entry (hash_cur (&hi), struct vm_entry, elem);
+      if (vme->swap_slot != (size_t) -1)
+        {
+          swap_free (vme->swap_slot);
+          vme->swap_slot = (size_t) -1;
+        }
+    }
+  frame_free_thread (cur);
+  /* 3 Virtual Memory - On process termination */
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
