@@ -30,6 +30,9 @@ static bool vm_less_func (const struct hash_elem *a, const struct hash_elem *b, 
 // hash_destroy에서 호출할 entry 삭제 함수. vm_entry 구조체만 free
 static void vm_destroy_action (struct hash_elem *e, void *aux) {
     struct vm_entry *vme = hash_entry (e, struct vm_entry, elem);
+    if (vme->swap_slot != (size_t)-1) {
+        swap_free (vme->swap_slot);
+    }
     free (vme);
 }
 
@@ -40,7 +43,6 @@ void spt_init (struct s_page_table *spt) {
 }
 
 void spt_destroy (struct s_page_table *spt) {
-    ASSERT (spt != NULL);
     hash_destroy (&spt->page_map, vm_destroy_action);
 }
 
@@ -193,5 +195,5 @@ bool expand_stack (void *upage) {
     }
     frame_unpin (kaddr);
 
-    return handle_fault (vme);
+    return true;
 }

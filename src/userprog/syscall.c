@@ -10,6 +10,7 @@
 #include "threads/malloc.h"
 #include "filesys/file.h"
 #include "vm/frame.h"
+#include "vm/page.h"
 #include "userprog/pagedir.h"
 
 struct lock file_system_lock;
@@ -46,9 +47,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   // printf ("system call!\n");
   // thread_exit ();
-  if(!is_mapped_user_vaddr(f->esp, sizeof(int))){
-    sys_exit (-1);
-  }
+  check_address (f->esp);
 
   int syscall_num = *(int *)(f->esp);
   int syscall_argu[3] = {0, };
@@ -145,11 +144,49 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}
 }
 
+void check_address (void *addr) {
+  if (addr == NULL || !is_user_vaddr(addr)) {
+    sys_exit (-1);
+  }
+
+  struct thread *cur = thread_current ();
+  struct vm_entry *vme = spt_find (&cur->spt, addr);
+
+  if (vme == NULL) {
+    sys_exit (-1);
+  }
+
+  if (!vme->is_loaded) {
+    if (!handle_fault (vme)) {
+      sys_exit (-1);
+    }
+  }
+}
+
 bool is_mapped_user_vaddr (const void *vaddr, size_t size){
   if(vaddr == NULL){
     return false;
   }
 
+  void *cur_addr = pg_round_down(vaddr);
+  void *end_addr = pg_round_down((uint8_t *)vaddr + size - 1);
+
+  struct thread *t = thread_current ();
+  while (cur_addr <= end_addr) {
+    if (!is_user_vaddr(cur_addr)){
+      return false;
+    }
+
+    struct vm_entry *vme = spt_find (&t->spt, cur_addr);
+    if (vme == NULL){
+      return false;
+    }
+    cur_addr += PGSIZE;
+  } 
+
+  return true;
+
+  /*
   const uint8_t *temp = (const uint8_t *)vaddr;
   const uint8_t *end = temp + size;
 
@@ -168,7 +205,7 @@ bool is_mapped_user_vaddr (const void *vaddr, size_t size){
   }
 
   return true;
-
+  */
 }
 
 void extract_arguments (struct intr_frame *f, int *syscall_argu, int argu_num){

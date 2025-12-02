@@ -43,6 +43,11 @@ void *frame_alloc (enum palloc_flags flags, struct vm_entry *vme) {
         }
         // victim frame의 page 재사용
         kpage = f->page_addr;
+
+        if (flags & PAL_ZERO) {
+            memset(kpage, 0, PGSIZE);
+        }
+        
     } else {
         // 새로운 프레임을 생성하여 frame table에 추가
         f = (struct frame *)malloc(sizeof *f);
@@ -112,18 +117,16 @@ void frame_free_thread (struct thread *t) {
         e = list_next(e);
 
         if (f->thread == t) {
-            if (clock_hand == &f->ft_elem) {
-                clock_hand = e;
-                if (clock_hand == list_end(&frame_table))
-                    clock_hand = list_empty(&frame_table) ? NULL : list_begin(&frame_table);
-            }
+            list_remove (&f->ft_elem);
 
-            list_remove(&f->ft_elem);
-            palloc_free_page(f->page_addr);
-            free(f);
+            if (t->pagedir != NULL && f->vm_entry_ != NULL)
+                pagedir_clear_page (t->pagedir, f->vm_entry_->vaddr);
+
+            palloc_free_page (f->page_addr);
+            free (f);
         }
     }
-
+    
     lock_release(&frame_table_lock);
 }
 

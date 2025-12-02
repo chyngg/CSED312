@@ -141,6 +141,13 @@ start_process (void *file_name_)
   
   /* 2-2 Argument Passing */
   argv = palloc_get_page(0);
+
+  if (argv == NULL) {
+    palloc_free_page(file_name);
+    palloc_free_page(fn_copy);
+    thread_exit();
+  }
+
   argc = fn_to_argv(argv, fn_copy);
 
   struct wait_status *ws = thread_current()->wait_status;
@@ -228,22 +235,12 @@ process_exit (void)
     mmap_elem = list_next (mmap_elem);
     sys_munmap (m->id);
   }
-
+  
+  frame_free_thread (cur);
   // s-page tables
   spt_destroy (&cur->spt);
+  
 
-  struct hash_iterator hi;
-  hash_first (&hi, &cur->spt.page_map);
-  while (hash_next (&hi))
-    {
-      struct vm_entry *vme = hash_entry (hash_cur (&hi), struct vm_entry, elem);
-      if (vme->swap_slot != (size_t) -1)
-        {
-          swap_free (vme->swap_slot);
-          vme->swap_slot = (size_t) -1;
-        }
-    }
-  frame_free_thread (cur);
   /* 3 Virtual Memory - On process termination */
 
   /* Destroy the current process's page directory and switch back
@@ -678,6 +675,22 @@ setup_stack (void **esp)
   vme->zero_bytes = PGSIZE;
   vme->swap_slot  = (size_t) -1;   /* 아직 swap에 안 나감 */
   vme->is_loaded  = false;         /* lazy loading이므로 아직 메모리에 없음 */
+
+  void *kpage = frame_alloc (PAL_USER | PAL_ZERO, vme);
+  if (kpage == NULL)
+  {
+    free (vme);
+    return false;
+  }
+
+  if (!install_page (upage, kpage, true)) 
+  {
+    frame_free (kpage);
+    free (vme);
+    return false; 
+  }
+
+  vme->is_loaded = true;
 
   if (!spt_insert (&t->spt, vme))
   {
