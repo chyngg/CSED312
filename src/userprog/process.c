@@ -236,6 +236,8 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  printf ("%s: exit(%d)\n", thread_name (), cur->exit_status);
+
   /* 1. mmap 해제 */
   struct list_elem *mmap_elem = list_begin (&cur->mmap_table);
   while (mmap_elem != list_end (&cur->mmap_table)) {
