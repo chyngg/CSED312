@@ -2,6 +2,7 @@
 
 #include <debug.h>
 #include <string.h>
+#include <stdlib.h>
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"

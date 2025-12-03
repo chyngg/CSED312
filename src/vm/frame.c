@@ -190,15 +190,19 @@ struct frame *frame_evict (void) {
     // dirty인 경우: file-backed이면 파일에 write back, 아니면 swap으로 내보내기
     bool dirty = pagedir_is_dirty(t->pagedir, vme->vaddr);
 
-    // swap out: file-backed 페이지면 file_write_at, 아니면 swap 공간에 저장, vm_entry 업데이트
-    if (dirty)
+    if (vme->type == VM_ANON) {
         swap_out(victim);
+    } else {
+        if (dirty)
+            swap_out(victim);
 
-    else {
-        // dirty가 아닌 경우는 단순히 vm_entry의 is_loaded를 false로 설정
-        pagedir_clear_page(t->pagedir, vme->vaddr);
-        vme->is_loaded = false;
+        else {
+            // dirty가 아닌 경우는 단순히 vm_entry의 is_loaded를 false로 설정
+            pagedir_clear_page(t->pagedir, vme->vaddr);
+            vme->is_loaded = false;
+        }
     }
+
 
     // victim frame 정보 초기화
     victim->vm_entry_ = NULL;

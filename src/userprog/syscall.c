@@ -34,6 +34,9 @@ void sys_munmap (mapid_t mapid);
 bool is_mapped_user_vaddr (const void *vaddr, size_t size);
 void extract_arguments (struct intr_frame *f, int *syscall_argu, int argu_num);
 struct file * access_file (int fd);
+static void copy_in (void *dst_, const void *usrc_, size_t size);
+static char *copy_in_string (const char *ustr);
+
 
 void
 syscall_init (void) 
@@ -48,11 +51,13 @@ syscall_handler (struct intr_frame *f UNUSED)
   // printf ("system call!\n");
   // thread_exit ();
   // check_address (f->esp);
-  if (f->esp == NULL || !is_user_vaddr(f->esp)){
+  if (!is_mapped_user_vaddr (f->esp, sizeof(int))) {
     sys_exit (-1);
   }
 
   int syscall_num = *(int *)(f->esp);
+  copy_in(&syscall_num, f->esp, sizeof syscall_num);
+
   int syscall_argu[3] = {0, };
 
   switch(syscall_num){
@@ -202,13 +207,13 @@ bool is_mapped_user_vaddr (const void *vaddr, size_t size){
 }
 
 void extract_arguments (struct intr_frame *f, int *syscall_argu, int argu_num){
-  void *vaddr = f->esp + 4;
-  if(!is_mapped_user_vaddr(vaddr, argu_num * (int)sizeof(int))){
+  uint8_t *uaddr = (uint8_t *) f->esp + 4;
+  if(!is_mapped_user_vaddr(uaddr, argu_num * (int)sizeof(int))){
     sys_exit (-1);
   }
   for (int i = 0; i < argu_num; i++){
-    syscall_argu[i] = *(int *)(vaddr);
-    vaddr += 4;
+    copy_in (&syscall_argu[i], uaddr, sizeof(int));
+    uaddr += sizeof(int);
   }
 }
 
@@ -230,7 +235,7 @@ bool is_valid_str(const char *str) {
   return true;
 }
 
-struct file * access_file (int fd){
+struct file * access_file (int fd) {
   if(2 <= fd && fd < thread_current()->fd_next){
     return thread_current()->fd_list[fd];
   }
@@ -243,10 +248,11 @@ static void copy_in (void *dst_, const void *usrc_, size_t size) {
   uint8_t *dst = dst_;
   const uint8_t *usrc = usrc_;
   for (size_t i = 0; i < size; i++) {
-    if (!is_user_vaddr(usrc) ||
-        pagedir_get_page(thread_current()->pagedir, (void *)usrc) == NULL)
+    if (!is_user_vaddr(usrc) || pagedir_get_page(thread_current()->pagedir, (void *)usrc) == NULL)
       sys_exit(-1);
-    dst[i] = *usrc++;
+    
+    dst[i] = *usrc;
+    usrc++;
   }
 }
 
