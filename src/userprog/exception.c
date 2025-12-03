@@ -73,45 +73,30 @@ exception_print_stats (void)
 static void
 kill (struct intr_frame *f) 
 {
-  /* This interrupt is one (probably) caused by a user process.
-     For example, the process might have tried to access unmapped
-     virtual memory (a page fault).  For now, we simply kill the
-     user process.  Later, we'll want to handle page faults in
-     the kernel.  Real Unix-like operating systems pass most
-     exceptions back to the process via signals, but we don't
-     implement them. */
-     
-  /* The interrupt frame's code segment value tells us where the
-     exception originated. */
   switch (f->cs)
     {
     case SEL_UCSEG:
-      /* User's code segment, so it's a user exception, as we
-         expected.  Kill the user process.  */
+      /* 유저 코드에서 난 예외 → 유저 프로세스만 죽임 */
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
-      // thread_exit (); 
-      sys_exit(-1);
+      thread_current()->exit_status = -1;
+      thread_exit ();
+      NOT_REACHED ();
+      /* NOT_REACHED */
 
     case SEL_KCSEG:
-      /* Kernel's code segment, which indicates a kernel bug.
-         Kernel code shouldn't throw exceptions.  (Page faults
-         may cause kernel exceptions--but they shouldn't arrive
-         here.)  Panic the kernel to make the point.  */
+      /* 커널 코드에서 난 예외 → 커널 버그이므로 그냥 패닉 */
       intr_dump_frame (f);
-      sys_exit(-1);
       PANIC ("Kernel bug - unexpected interrupt in kernel"); 
 
     default:
-      /* Some other code segment?  Shouldn't happen.  Panic the
-         kernel. */
       printf ("Interrupt %#04x (%s) in unknown segment %04x\n",
-             f->vec_no, intr_name (f->vec_no), f->cs);
-      // thread_exit ();
-      sys_exit(-1);
+              f->vec_no, intr_name (f->vec_no), f->cs);
+      PANIC ("Unexpected interrupt in unknown segment");
     }
 }
+
 
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
@@ -132,78 +117,89 @@ page_fault (struct intr_frame *f)
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
 
-  /* Obtain faulting address, the virtual address that was
-     accessed to cause the fault.  It may point to code or to
-     data.  It is not necessarily the address of the instruction
-     that caused the fault (that's f->eip).
-     See [IA32-v2a] "MOV--Move to/from Control Registers" and
-     [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
-     (#PF)". */
   asm ("movl %%cr2, %0" : "=r" (fault_addr));
 
-  /* Turn interrupts back on (they were only off so that we could
-     be assured of reading CR2 before it changed). */
   intr_enable ();
-
-  /* Count page faults. */
   page_fault_cnt++;
 
-  /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
-  write = (f->error_code & PF_W) != 0;
-  user = (f->error_code & PF_U) != 0;
+  write       = (f->error_code & PF_W) != 0;
+  user        = (f->error_code & PF_U) != 0;
 
-  struct thread *t = thread_current();
-  if (!not_present) {
-   // write to read-only page
-   if (user) 
-      sys_exit(-1);
-   
-   else 
-      kill (f);
-      
-   return;
-  }
+  struct thread *t = thread_current ();
 
-  if (!is_user_vaddr(fault_addr) || fault_addr == NULL) {
-   if (user) 
-      sys_exit(-1);
-   
-   else 
-      kill (f);
-      
-   return;
-  }
+  /* 1) write to read-only page */
+  if (!not_present) 
+    {
+      if (user)
+        {
+          t->exit_status = -1;
+          thread_exit ();
+        }
+      else 
+        {
+          kill (f);
+        }
+      NOT_REACHED ();
+    }
 
+  /* 2) user 영역이 아니거나 NULL 접근 */
+  if (!is_user_vaddr (fault_addr) || fault_addr == NULL)
+    {
+      if (user)
+        {
+          t->exit_status = -1;
+          thread_exit ();
+        }
+      else 
+        {
+          kill (f);
+        }
+      NOT_REACHED ();
+    }
+
+  /* 3) SPT에서 vm_entry 찾기 */
   struct vm_entry *vme = spt_find (&t->spt, fault_addr);
   if (vme != NULL)
-  {
-   if (!handle_fault (vme)) {
-      if (user) 
-         sys_exit(-1);
-      
-      else 
-         kill (f);
-         
+    {
+      if (!handle_fault (vme))
+        {
+          if (user)
+            {
+              t->exit_status = -1;
+              thread_exit ();
+            }
+          else
+            {
+              kill (f);
+            }
+        }
       return;
-   }
-  }
+    }
 
-   if (user)
-   {
-   void *esp = f->esp;
-   if (check_stack_boundary (fault_addr, esp)) {
-      void *upage = pg_round_down (fault_addr);
-      if (!expand_stack (upage)) 
-         sys_exit(-1);
-      return;
-   }
-   sys_exit(-1);
-   }
+  /* 4) stack growth 체크 */
+  if (user)
+    {
+      void *esp = f->esp;
+      if (check_stack_boundary (fault_addr, esp))
+        {
+          void *upage = pg_round_down (fault_addr);
+          if (!expand_stack (upage))
+            {
+              t->exit_status = -1;
+              thread_exit ();
+            }
+          return;
+        }
 
-   else {
+      /* stack growth도 아니면 잘못된 접근 */
+      t->exit_status = -1;
+      thread_exit ();
+    }
+  else
+    {
       kill (f);
-   }
-
+    }
 }
+
 

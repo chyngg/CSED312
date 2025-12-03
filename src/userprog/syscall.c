@@ -47,7 +47,10 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   // printf ("system call!\n");
   // thread_exit ();
-  check_address (f->esp);
+  // check_address (f->esp);
+  if (f->esp == NULL || !is_user_vaddr(f->esp)){
+    sys_exit (-1);
+  }
 
   int syscall_num = *(int *)(f->esp);
   int syscall_argu[3] = {0, };
@@ -146,45 +149,35 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 void check_address (void *addr) {
   if (addr == NULL || !is_user_vaddr(addr)) {
-    sys_exit (-1);
+    sys_exit(-1);
   }
 
-  struct thread *cur = thread_current ();
-  struct vm_entry *vme = spt_find (&cur->spt, addr);
-
-  if (vme == NULL) {
-    sys_exit (-1);
-  }
-
-  if (!vme->is_loaded) {
-    if (!handle_fault (vme)) {
-      sys_exit (-1);
-    }
+  if (pagedir_get_page(thread_current()->pagedir, addr) == NULL) {
+    sys_exit(-1);
   }
 }
 
+
+
 bool is_mapped_user_vaddr (const void *vaddr, size_t size){
-  if(vaddr == NULL){
-    return false;
+  if (vaddr == NULL) return false;
+
+  const uint8_t *ptr = vaddr;
+  const uint8_t *end = ptr + size;
+
+  while (ptr < end) {
+    if (!is_user_vaddr(ptr))
+      return false;
+
+    void *kpage = pagedir_get_page(thread_current()->pagedir, (void *)ptr);
+    if (kpage == NULL)
+      return false;
+
+    /* 다음 페이지 경계로 점프 */
+    ptr = (const uint8_t *)pg_round_down((void *)ptr) + PGSIZE;
   }
-
-  void *cur_addr = pg_round_down(vaddr);
-  void *end_addr = pg_round_down((uint8_t *)vaddr + size - 1);
-
-  struct thread *t = thread_current ();
-  while (cur_addr <= end_addr) {
-    if (!is_user_vaddr(cur_addr)){
-      return false;
-    }
-
-    struct vm_entry *vme = spt_find (&t->spt, cur_addr);
-    if (vme == NULL){
-      return false;
-    }
-    cur_addr += PGSIZE;
-  } 
-
   return true;
+
 
   /*
   const uint8_t *temp = (const uint8_t *)vaddr;

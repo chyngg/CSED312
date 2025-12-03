@@ -109,7 +109,6 @@ main (void)
   gdt_init ();
 #endif
 
-  swap_init();
 
 
   /* Initialize interrupt handlers. */

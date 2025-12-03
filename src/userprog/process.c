@@ -68,15 +68,15 @@ process_execute (const char *file_name)
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (filename, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR){
-    palloc_free_page (fn_copy); 
-    list_remove(&ws->elem); palloc_free_page(ws);
+    //palloc_free_page (fn_copy); 
+    //list_remove(&ws->elem); palloc_free_page(ws);
     palloc_free_page(fn_copy2);
     return TID_ERROR;
   }
   // ws->tid = tid;
   struct thread *child = get_child_process(tid);
   if (!child) {
-    list_remove(&ws->elem); palloc_free_page(ws);
+    //list_remove(&ws->elem); palloc_free_page(ws);
     palloc_free_page(fn_copy2);
     return TID_ERROR;
   }
@@ -87,8 +87,8 @@ process_execute (const char *file_name)
   /* 2-2. Argument Passing */
   sema_down(&ws->load_sema);
   if (!ws->load_success) {
-    list_remove(&ws->elem);
-    palloc_free_page(ws);
+    // list_remove(&ws->elem);
+    // palloc_free_page(ws);
     palloc_free_page(fn_copy2);
     return TID_ERROR;
   }
@@ -138,6 +138,13 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
+#ifdef VM
+  struct thread *t = thread_current ();
+  spt_init (&t->spt);          // SPT 초기화
+  list_init (&t->mmap_table);  // mmap 테이블 초기화
+  t->next_mapid = 1;           // mapid 시작값
+#endif
   
   /* 2-2 Argument Passing */
   argv = palloc_get_page(0);
@@ -221,47 +228,23 @@ process_wait (tid_t child_tid)
 }
 
 /* Free the current process's resources. */
+/* userprog/process.c */
+
 void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  /* 3 Virtual Memory - On process termination */
-  // mmap table
+  /* 1. mmap 해제 */
   struct list_elem *mmap_elem = list_begin (&cur->mmap_table);
   while (mmap_elem != list_end (&cur->mmap_table)) {
     struct mmap_entry *m = list_entry (mmap_elem, struct mmap_entry, elem);
-    mmap_elem = list_next (mmap_elem);
+    mmap_elem = list_next (mmap_elem); // 다음 요소를 미리 저장
     sys_munmap (m->id);
   }
-  
-  frame_free_thread (cur);
-  // s-page tables
-  spt_destroy (&cur->spt);
-  
 
-  /* 3 Virtual Memory - On process termination */
-
-  /* Destroy the current process's page directory and switch back
-     to the kernel-only page directory. */
-  pd = cur->pagedir;
-  if (pd != NULL) 
-    {
-      /* Correct ordering here is crucial.  We must set
-         cur->pagedir to NULL before switching page directories,
-         so that a timer interrupt can't switch back to the
-         process page directory.  We must activate the base page
-         directory before destroying the process's page
-         directory, or our active page directory will be one
-         that's been freed (and cleared). */
-      cur->pagedir = NULL;
-      pagedir_activate (NULL);
-      pagedir_destroy (pd);
-    }
-
-  /* 2-3. System Call */
-  // should clean fd_list 
+  /* 2. fd_list (열린 파일) 정리 */
   if(cur->fd_list){
     for(int fd = 2; fd < cur->fd_next; fd++){
       if(cur->fd_list[fd]){
@@ -275,30 +258,7 @@ process_exit (void)
     cur->fd_list = NULL;
   }
 
-  // should remove from child_list
-  if (cur->parent != NULL) {
-      list_remove(&cur->child_list_elem);
-  }
-
-  // should clean wait_list 
-  struct list_elem *e;
-  struct list_elem *next;
-  for (e = list_begin(&cur->wait_list); e != list_end(&cur->wait_list); e = next) {
-    next = list_next(e);
-    struct wait_status *ws = list_entry(e, struct wait_status, elem);
-    list_remove(e);
-    palloc_free_page(ws);
-  }
-  /* 2-3. System Call */
-
-  /* 2-2 Argument Passing - process_wait */
-  if (cur->wait_status) {
-    cur->wait_status->exit_code = cur->exit_status;
-    sema_up(&cur->wait_status->sema);
-  }
-  /* 2-2 Argument Passing - process_wait */
-
-  /* 2-3. System Call - ROX */
+  /* 3. 현재 실행 중인 파일(ROX) 닫기 */
   if (cur->executing_file) {
     lock_acquire(&file_system_lock);
     file_allow_write(cur->executing_file);
@@ -306,7 +266,43 @@ process_exit (void)
     cur->executing_file = NULL;
     lock_release(&file_system_lock);
   }
-  /* 2-3. System Call - ROX */
+
+  /* 4. 부모 프로세스에게 종료 알림 (중요: 메모리 해제 전에 수행) */
+  if (cur->wait_status) {
+    cur->wait_status->exit_code = cur->exit_status;
+    sema_up(&cur->wait_status->sema); 
+    cur->wait_status = NULL;
+  }
+
+  /* 5. 리스트 정리 */
+  // child_list 정리
+  if (cur->parent != NULL) {
+      list_remove(&cur->child_list_elem);
+  }
+  /*
+  // wait_list 정리
+  struct list_elem *e;
+  struct list_elem *next;
+  for (e = list_begin(&cur->wait_list); e != list_end(&cur->wait_list); e = next) {
+    next = list_next(e);
+    struct wait_status *ws = list_entry(e, struct wait_status, elem);
+    list_remove(e);
+    palloc_free_page(ws);
+  } */
+
+  /* 6. 메모리 관련 자원 해제 (반드시 다른 작업이 다 끝난 후 수행) */
+  // [위치 변경됨] frame과 spt 해제를 여기로 이동
+  frame_free_thread (cur);
+  spt_destroy (&cur->spt);
+
+  /* 7. 페이지 디렉토리 파괴 (가장 마지막) */
+  pd = cur->pagedir;
+  if (pd != NULL) 
+    {
+      cur->pagedir = NULL;
+      pagedir_activate (NULL);
+      pagedir_destroy (pd);
+    }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -694,6 +690,8 @@ setup_stack (void **esp)
 
   if (!spt_insert (&t->spt, vme))
   {
+    pagedir_clear_page (t->pagedir, upage);
+    frame_free (kpage);
     free (vme);
     return false;
   } 
@@ -737,7 +735,7 @@ int fn_to_argv(char **argv, char *fn_copy) {
 void stack_argv(char **argv, int argc, void **esp) {
   int i = 0;
   int length = 0;
-  void *arg_addresses[argc];
+  // void *arg_addresses[argc];
 
   // Push arguments onto the stack in reverse order
   for (i = argc - 1; i >= 0; i--) {

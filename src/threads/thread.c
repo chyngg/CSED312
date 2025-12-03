@@ -267,17 +267,18 @@ struct thread *
 thread_current (void) 
 {
   struct thread *t = running_thread ();
-  
-  /* Make sure T is really a thread.
-     If either of these assertions fire, then your thread may
-     have overflowed its stack.  Each thread has less than 4 kB
-     of stack, so a few big automatic arrays or moderate
-     recursion can cause stack overflow. */
+
+  if (t->status != THREAD_RUNNING) {
+    // 부팅 초기에 한 번 찍히는 정도면 무시 가능
+    printf("DBG thread_current: status=%d name=%s tid=%d\n", t->status, t->name, t->tid);
+  }
+
   ASSERT (is_thread (t));
   ASSERT (t->status == THREAD_RUNNING);
 
   return t;
 }
+
 
 /* Returns the running thread's tid. */
 tid_t
@@ -566,7 +567,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->executing_file = NULL;
   /* 2-3. System Call - ROX */
 #endif
-  spt_init(&t->spt); /* VM */
+  // spt_init(&t->spt); /* VM */
 
   /* 3 Virtual Memory - File memory mapping */
   list_init (&t->mmap_table);
