@@ -169,17 +169,27 @@ bool is_mapped_user_vaddr (const void *vaddr, size_t size){
 
   const uint8_t *ptr = vaddr;
   const uint8_t *end = ptr + size;
+  struct thread *t = thread_current ();
 
   while (ptr < end) {
     if (!is_user_vaddr(ptr))
       return false;
 
-    void *kpage = pagedir_get_page(thread_current()->pagedir, (void *)ptr);
-    if (kpage == NULL)
-      return false;
+    void *upage = pg_round_down ((void *) ptr);
+    void *kpage = pagedir_get_page (t->pagedir, upage);
+    if (kpage == NULL) {
+      struct vm_entry *vme = spt_find (&t->spt, upage);
+      if (vme == NULL)
+        return false;
+      if (!vme->is_loaded && !handle_fault (vme))
+        return false;
+      kpage = pagedir_get_page (t->pagedir, upage);
+      if (kpage == NULL)
+        return false;
+    }
 
     /* 다음 페이지 경계로 점프 */
-    ptr = (const uint8_t *)pg_round_down((void *)ptr) + PGSIZE;
+    ptr = (const uint8_t *) upage + PGSIZE;
   }
   return true;
 

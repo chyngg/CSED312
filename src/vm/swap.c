@@ -69,6 +69,9 @@ swap_out (struct frame *f)
   lock_release (&swap_lock);
 
   vme->swap_slot = slot;
+  if (vme->type == VM_BIN){
+    vme->type = VM_ANON; // anonymous
+  }
   vme->is_loaded = false;
   pagedir_clear_page (t->pagedir, vme->vaddr);
   return true;

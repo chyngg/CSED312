@@ -103,6 +103,28 @@ bool handle_fault (struct vm_entry *vme) {
     ASSERT (!vme->is_loaded);
 
     struct thread *t = thread_current();
+
+    // if page is swapped out, reload
+    if (vme->swap_slot != (size_t)-1) {
+        void *kaddr = frame_alloc (PAL_USER, vme);
+        if (kaddr == NULL)
+            return false;
+
+        if (!swap_in (vme, kaddr)) {
+            frame_free (kaddr);
+            return false;
+        }
+
+        if (!pagedir_set_page (t->pagedir, vme->vaddr, kaddr, vme->writable)) {
+            frame_free (kaddr);
+            return false;
+        }
+
+        vme->is_loaded = true;
+        frame_unpin (kaddr);
+        return true;
+    }
+
     void *kaddr = frame_alloc (PAL_USER, vme);
     if (kaddr == NULL) 
         return false;
