@@ -4,14 +4,16 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+
+extern struct lock file_system_lock;
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -131,8 +133,10 @@ page_fault (struct intr_frame *f)
   /* 1) write to read-only page */
   if (!not_present) 
     {
-      if (user)
+      if (user || is_user_vaddr (fault_addr))
         {
+          if (lock_held_by_current_thread (&file_system_lock))
+            lock_release (&file_system_lock);
           t->exit_status = -1;
           thread_exit ();
         }
@@ -197,9 +201,10 @@ page_fault (struct intr_frame *f)
       thread_exit ();
     }
   else
-    {
-      kill (f);
-    }
+  {
+    t->exit_status = -1;
+    thread_exit ();
+  }
 }
 
 
