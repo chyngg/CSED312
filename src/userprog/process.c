@@ -238,7 +238,7 @@ process_exit (void)
 
   printf ("%s: exit(%d)\n", thread_name (), cur->exit_status);
 
-  /* 1. mmap 해제 */
+  /* mmap 해제 */
   struct list_elem *mmap_elem = list_begin (&cur->mmap_table);
   while (mmap_elem != list_end (&cur->mmap_table)) {
     struct mmap_entry *m = list_entry (mmap_elem, struct mmap_entry, elem);
@@ -246,7 +246,7 @@ process_exit (void)
     sys_munmap (m->id);
   }
 
-  /* 2. fd_list (열린 파일) 정리 */
+  /* fd_list (열린 파일) 정리 */
   if(cur->fd_list){
     for(int fd = 2; fd < cur->fd_next; fd++){
       if(cur->fd_list[fd]){
@@ -260,7 +260,7 @@ process_exit (void)
     cur->fd_list = NULL;
   }
 
-  /* 3. 현재 실행 중인 파일(ROX) 닫기 */
+  /* 현재 실행 중인 파일(ROX) 닫기 */
   if (cur->executing_file) {
     lock_acquire(&file_system_lock);
     file_allow_write(cur->executing_file);
@@ -269,14 +269,14 @@ process_exit (void)
     lock_release(&file_system_lock);
   }
 
-  /* 4. 부모 프로세스에게 종료 알림 (중요: 메모리 해제 전에 수행) */
+  /* 부모 프로세스에게 종료 알림 */
   if (cur->wait_status) {
     cur->wait_status->exit_code = cur->exit_status;
     sema_up(&cur->wait_status->sema); 
     cur->wait_status = NULL;
   }
 
-  /* 5. 리스트 정리 */
+  /* 리스트 정리 */
   // child_list 정리
   if (cur->parent != NULL) {
       list_remove(&cur->child_list_elem);
@@ -292,12 +292,11 @@ process_exit (void)
     palloc_free_page(ws);
   } */
 
-  /* 6. 메모리 관련 자원 해제 (반드시 다른 작업이 다 끝난 후 수행) */
-  // [위치 변경됨] frame과 spt 해제를 여기로 이동
+  /* 메모리 관련 자원 해제 (반드시 다른 작업이 다 끝난 후 수행) */
   frame_free_thread (cur);
   spt_destroy (&cur->spt);
 
-  /* 7. 페이지 디렉토리 파괴 (가장 마지막) */
+  /* 페이지 디렉토리 파괴 */
   pd = cur->pagedir;
   if (pd != NULL) 
     {

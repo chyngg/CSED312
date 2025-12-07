@@ -269,7 +269,6 @@ thread_current (void)
   struct thread *t = running_thread ();
 
   if (t->status != THREAD_RUNNING) {
-    // 부팅 초기에 한 번 찍히는 정도면 무시 가능
     printf("DBG thread_current: status=%d name=%s tid=%d\n", t->status, t->name, t->tid);
   }
 

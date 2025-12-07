@@ -78,17 +78,16 @@ kill (struct intr_frame *f)
   switch (f->cs)
     {
     case SEL_UCSEG:
-      /* 유저 코드에서 난 예외 → 유저 프로세스만 죽임 */
+      /* 유저 코드에서 난 예외 */
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
       thread_current()->exit_status = -1;
       thread_exit ();
       NOT_REACHED ();
-      /* NOT_REACHED */
 
     case SEL_KCSEG:
-      /* 커널 코드에서 난 예외 → 커널 버그이므로 그냥 패닉 */
+      /* 커널 코드에서 난 예외 */
       intr_dump_frame (f);
       PANIC ("Kernel bug - unexpected interrupt in kernel"); 
 
@@ -130,7 +129,7 @@ page_fault (struct intr_frame *f)
 
   struct thread *t = thread_current ();
 
-  /* 1) write to read-only page */
+  /* write to read-only page */
   if (!not_present) 
     {
       if (user || is_user_vaddr (fault_addr))
@@ -147,7 +146,7 @@ page_fault (struct intr_frame *f)
       NOT_REACHED ();
     }
 
-  /* 2) user 영역이 아니거나 NULL 접근 */
+  /* user 영역이 아니거나 NULL 접근 */
   if (!is_user_vaddr (fault_addr) || fault_addr == NULL)
     {
       if (user)
@@ -162,7 +161,7 @@ page_fault (struct intr_frame *f)
       NOT_REACHED ();
     }
 
-  /* 3) SPT에서 vm_entry 찾기 */
+  /* SPT에서 vm_entry 찾기 */
   struct vm_entry *vme = spt_find (&t->spt, fault_addr);
   if (vme != NULL)
     {
@@ -181,7 +180,7 @@ page_fault (struct intr_frame *f)
       return;
     }
 
-  /* 4) stack growth 체크 */
+  /* stack growth 체크 */
   if (user)
     {
       void *esp = f->esp;

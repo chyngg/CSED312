@@ -14,7 +14,6 @@
 
 extern struct lock file_system_lock;
 
-/* Hash helpers */
 // vme의 vaddr을 기준으로 해시 값 계산
 static unsigned vm_hash_func (const struct hash_elem *e, void *aux) {
     struct vm_entry *vme = hash_entry (e, struct vm_entry, elem);
